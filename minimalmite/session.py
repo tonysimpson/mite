@@ -85,6 +85,7 @@ class SessionController:
         self._socket_multi_map = {}
         self._perform_running = False
         self._futures = {}
+        self._loop = asyncio.get_event_loop()
 
     def _socket_poll_register_or_modify(self, socket, multi, mask):
         if socket in self._registered:
@@ -93,11 +94,15 @@ class SessionController:
             self._epoll.register(socket, mask)
             self._registered.add(socket)
             self._socket_multi_map[socket] = multi
+        if not self._perform_running:
+            asyncio.ensure_future(self._perform())
 
     def _socket_poll_none(self, multi, socket):
         self._epoll.register(socket)
         self._registered.add(socket)
         self._socket_multi_map[socket] = multi
+        if not self._perform_running:
+            asyncio.ensure_future(self._perform())
 
     def _socket_poll_in(self, multi, socket):
         self._socket_poll_register_or_modify(socket, multi, select.EPOLLIN)
@@ -145,7 +150,8 @@ class SessionController:
         assert not self._perform_running
         self._perform_running = True
         while self._registered:
-            for fd, event in self._epoll.select(0):
+            multis_to_finish = set()
+            for fd, event in self._epoll.select():
                 multi = self._socket_multi_map[fd.fd]
                 ev_bitmask = 0
                 if event & select.EPOLLIN:
@@ -155,6 +161,8 @@ class SessionController:
                 if event & select.EPOLLERR:
                     ev_bitmask |= pycurl.CSELECT_ERR
                 code, remaining = multi.socket_action(fd.fd, ev_bitmask)
+                multis_to_finish.add(multi)
+            for multi in multis_to_finish:
                 self._finish(multi)
         self._perform_running = False
 
@@ -163,8 +171,8 @@ class SessionController:
         self._finish(multi)
 
     def _timer_call_back(self, multi, milliseconds):
-        loop = asyncio.get_event_loop()
-        loop.call_later(milliseconds / 1000, self._timeout, multi)
+        if milliseconds >= 0:
+            self._loop.call_later(milliseconds / 1000, self._timeout, multi)
 
     def create_new_session(self, profile=None, metrics_callback=None):
         multi = pycurl.CurlMulti()
@@ -177,7 +185,5 @@ class SessionController:
         self._futures[handle] = future
         multi.add_handle(handle)
         self._timeout(multi)
-        if not self._perform_running:
-            asyncio.ensure_future(self._perform())
         return future
 
