@@ -133,6 +133,8 @@ class SessionController:
             self._socket_poll_remove(multi, socket)
         else:
             raise ValueError("unhandled event type %r" % event)
+        if not self._perform_running:
+            asyncio.ensure_future(self._perform())
 
     def _finish(self, multi):
         num_msgs, successes, errors = multi.info_read()
