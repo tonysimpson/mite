@@ -25,6 +25,7 @@ def get_metrics(creq):
         'first_byte_time': creq.getinfo(pycurl.STARTTRANSFER_TIME),
         'redirect_time': creq.getinfo(pycurl.REDIRECT_TIME),
         'total_time': creq.getinfo(pycurl.TOTAL_TIME),
+        'primary_ip': creq.getinfo(pycurl.CURLINFO_PRIMARY_IP),
     }
 
 
@@ -33,6 +34,7 @@ class BaseProfile:
     max_connections = None
     connection_timeout = 60
     user_agent = None
+    dns_servers = None
 
 
 
@@ -53,6 +55,8 @@ class session:
         if self._metrics_callback is not None:
             metrics = {'time': time.time(), 'method': method, 'url': url}
         opener = pycurl.Curl()
+        if self._profile.dns_servers is not None:
+            opener.setopt(pycurl.DNS_SERVERS, self._profile.dns_servers)
         opener.setopt(pycurl.SHARE, self._shared_handle)
         creq = request.build_opener(opener)
         await self._controller.perform(self._multi, creq)
