@@ -6,6 +6,6 @@ setup(
         version='0.0.1a0',
         install_requires=[
             'docopt',
-            'msgpack'
+            'msgpack-python'
         ]
 )
