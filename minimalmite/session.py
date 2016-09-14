@@ -89,6 +89,10 @@ class RequestError(Exception):
     pass
 
 
+
+_PYCURL_ERROR_CODES = {getattr(pycurl, name): name[2:] for name in dir(pycurl) if name.startswith('E_')}
+
+
 class SessionController:
     def __init__(self):
         self._epoll = asyncio.selectors.EpollSelector()
@@ -153,7 +157,7 @@ class SessionController:
             multi.remove_handle(success)
         for errored, error_num, error_msg in errors:
             future = self._futures.pop(errored)
-            future.set_exception(RequestError(error_msg))
+            future.set_exception(RequestError("Error for %r - %r" % (errored, _PYCURL_ERROR_CODES[error_num])))
             errored.close()
             multi.remove_handle(errored)
 
