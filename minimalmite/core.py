@@ -2,6 +2,7 @@ from nanomsg import *
 import msgpack
 import docopt
 
+
 class ActivityGroupVolumeManager:
     def started(self, elapsed_time, activity_id):
         pass
@@ -15,7 +16,7 @@ class ActivityGroupVolumeManager:
 
 class Activity:
     def __init__(self, activity_id, activity_name, params):
-
+        pass
 
 
 class ActivitySource:

@@ -12,11 +12,11 @@ logging.basicConfig()#level=logging.DEBUG)
 S = int(sys.argv[1])
 N = int(sys.argv[2])
 
-results_file = open("results_%d_%d.msgpack" % (S, N), "wb")
+#results_file = open("results_%d_%d.msgpack" % (S, N), "wb")
 packer = msgpack.Packer()
 
 async def test():
-    session = controller.create_new_session(metrics_callback=lambda d: results_file.write(packer.pack(d)))
+    session = controller.create_new_session() #metrics_callback=lambda d: results_file.write(packer.pack(d)))
     for i in range(N):
         try:
             await session.request('GET', 'http://127.0.0.1:9003')

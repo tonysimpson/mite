@@ -1,11 +1,11 @@
 import pycurl
 import asyncio
+import selectors
 import urllib
 from io import BytesIO
 import time
 import logging
 from functools import partial
-import select
 from human_curl import Request
 
 
@@ -28,19 +28,28 @@ def get_metrics(creq):
     }
 
 
+class BaseProfile:
+    connections_per_host = 6
+    max_connections = None
+    connection_timeout = 60
+    user_agent = None
+
+
 
 class session:
-    def __init__(self, controller, multi, profile, metrics_callback=None):
+    def __init__(self, controller, multi, profile=None, metrics_callback=None):
         self._shared_handle = pycurl.CurlShare()
         self._shared_handle.setopt(pycurl.SH_SHARE, pycurl.LOCK_DATA_COOKIE)
         self._shared_handle.setopt(pycurl.SH_SHARE, pycurl.LOCK_DATA_DNS)
         self._metrics_callback = metrics_callback
+        if profile is None:
+            profile = BaseProfile()
         self._profile = profile
         self._controller = controller
         self._multi = multi
 
     async def request(self, method, url, *args, **kwargs):
-        request = Request(method, url, *args, **kwargs)
+        request = Request(method, url, user_agent=self.user_agent, *args, **kwargs)
         if self._metrics_callback is not None:
             metrics = {'time': time.time(), 'method': method, 'url': url}
         opener = pycurl.Curl()
@@ -51,6 +60,14 @@ class session:
             metrics.update(get_metrics(creq))
             self._metrics_callback(metrics)
         return request.make_response()
+
+    @property
+    def user_agent(self):
+        return self._profile.user_agent
+
+    @user_agent.setter
+    def user_agent_setter(self, value):
+        self._profile.user_agent = value
 
     def _close(self):
         if self._shared_handle is not None:
@@ -66,12 +83,6 @@ class session:
     def __del__(self):
         self._close()
 
-
-class BaseProfile:
-    connections_per_host = 6
-    max_connections = None
-    connection_timeout = 60
-    user_agent = None
 
 
 class RequestError(Exception):
@@ -105,15 +116,15 @@ class SessionController:
             asyncio.ensure_future(self._perform())
 
     def _socket_poll_in(self, multi, socket):
-        self._socket_poll_register_or_modify(socket, multi, select.EPOLLIN)
+        self._socket_poll_register_or_modify(socket, multi, selectors.EVENT_READ)
 
     def _socket_poll_out(self, multi, socket):
-        self._socket_poll_register_or_modify(socket, multi, select.EPOLLOUT)
+        self._socket_poll_register_or_modify(socket, multi, selectors.EVENT_WRITE)
 
     def _socket_poll_in_out(self, multi, socket):
         self._socket_poll_register_or_modify(socket, multi,
-                                             select.EPOLLIN |
-                                             select.EPOLLOUT)
+                                             selectors.EVENT_READ |
+                                             selectors.EVENT_WRITE)
 
     def _socket_poll_remove(self, multi, socket):
         self._epoll.unregister(socket)
@@ -133,7 +144,7 @@ class SessionController:
             self._socket_poll_remove(multi, socket)
         else:
             raise ValueError("unhandled event type %r" % event)
-    
+ 
     def _finish(self, multi):
         num_msgs, successes, errors = multi.info_read()
         for success in successes:
@@ -151,16 +162,14 @@ class SessionController:
         self._perform_running = True
         while self._registered:
             multis_to_finish = set()
-            for fd, event in self._epoll.select():
-                multi = self._socket_multi_map[fd.fd]
+            for key, event in self._epoll.select():
+                multi = self._socket_multi_map[key.fd]
                 ev_bitmask = 0
-                if event & select.EPOLLIN:
+                if event & selectors.EVENT_READ:
                     ev_bitmask |= pycurl.CSELECT_IN
-                if event & select.EPOLLOUT:
+                if event & selectors.EVENT_WRITE:
                     ev_bitmask |= pycurl.CSELECT_OUT
-                if event & select.EPOLLERR:
-                    ev_bitmask |= pycurl.CSELECT_ERR
-                code, remaining = multi.socket_action(fd.fd, ev_bitmask)
+                code, remaining = multi.socket_action(key.fd, ev_bitmask)
                 multis_to_finish.add(multi)
             for multi in multis_to_finish:
                 self._finish(multi)
