@@ -25,7 +25,7 @@ def get_metrics(creq):
         'first_byte_time': creq.getinfo(pycurl.STARTTRANSFER_TIME),
         'redirect_time': creq.getinfo(pycurl.REDIRECT_TIME),
         'total_time': creq.getinfo(pycurl.TOTAL_TIME),
-        'primary_ip': creq.getinfo(pycurl.CURLINFO_PRIMARY_IP),
+        'primary_ip': creq.getinfo(pycurl.PRIMARY_IP),
     }
 
 
