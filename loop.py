@@ -21,7 +21,7 @@ async def test():
         try:
             await session.request('GET', 'http://127.0.0.1:9003')
         except Exception as e:
-            print(e)
+            print('error:', repr(e))
     print(N / (time.time() - st))
 
 loop = asyncio.get_event_loop()

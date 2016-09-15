@@ -99,57 +99,26 @@ _PYCURL_ERROR_CODES = {getattr(pycurl, name): name[2:] for name in dir(pycurl) i
 
 class SessionController:
     def __init__(self):
-        self._epoll = asyncio.selectors.EpollSelector()
-        self._registered = set()
-        self._socket_multi_map = {}
-        self._perform_running = False
         self._futures = {}
         self._loop = asyncio.get_event_loop()
 
-    def _socket_poll_register_or_modify(self, socket, multi, mask):
-        if socket in self._registered:
-            self._epoll.modify(socket, mask)
-        else:
-            self._epoll.register(socket, mask)
-            self._registered.add(socket)
-            self._socket_multi_map[socket] = multi
-        if not self._perform_running:
-            asyncio.ensure_future(self._perform())
-
-    def _socket_poll_none(self, multi, socket):
-        self._epoll.register(socket)
-        self._registered.add(socket)
-        self._socket_multi_map[socket] = multi
-        if not self._perform_running:
-            asyncio.ensure_future(self._perform())
-
-    def _socket_poll_in(self, multi, socket):
-        self._socket_poll_register_or_modify(socket, multi, selectors.EVENT_READ)
-
-    def _socket_poll_out(self, multi, socket):
-        self._socket_poll_register_or_modify(socket, multi, selectors.EVENT_WRITE)
-
-    def _socket_poll_in_out(self, multi, socket):
-        self._socket_poll_register_or_modify(socket, multi,
-                                             selectors.EVENT_READ |
-                                             selectors.EVENT_WRITE)
-
-    def _socket_poll_remove(self, multi, socket):
-        self._epoll.unregister(socket)
-        self._registered.remove(socket)
-        del self._socket_multi_map[socket]
+    def _socket_event_call_back(self, multi, fd, bitmask):
+        code, remaining = multi.socket_action(fd, bitmask)
+        self._finish(multi)
 
     def _socket_call_back(self, event, socket, multi, data):
         if event == pycurl.POLL_NONE:
-            self._socket_poll_none(multi, socket)
+            print('What do POLL_NONE')
         elif event == pycurl.POLL_IN:
-            self._socket_poll_in(multi, socket)
+            self._loop.add_reader(socket, self._socket_event_call_back, multi, socket, pycurl.CSELECT_IN)
         elif event == pycurl.POLL_OUT:
-            self._socket_poll_out(multi, socket)
+            self._loop.add_writer(socket, self._socket_event_call_back, multi, socket, pycurl.CSELECT_OUT)
         elif event == pycurl.POLL_INOUT:
-            self._socket_poll_in_out(multi, socket)
+            self._loop.add_reader(socket, self._socket_event_call_back, multi, socket, pycurl.CSELECT_IN)
+            self._loop.add_writer(socket, self._socket_event_call_back, multi, socket, pycurl.CSELECT_OUT)
         elif event == pycurl.POLL_REMOVE:
-            self._socket_poll_remove(multi, socket)
+            self._loop.remove_reader(socket)
+            self._loop.remove_writer(socket)
         else:
             raise ValueError("unhandled event type %r" % event)
  
@@ -164,24 +133,6 @@ class SessionController:
             future.set_exception(RequestError("Error for %r - %r" % (errored, _PYCURL_ERROR_CODES[error_num])))
             errored.close()
             multi.remove_handle(errored)
-
-    async def _perform(self):
-        assert not self._perform_running
-        self._perform_running = True
-        while self._registered:
-            multis_to_finish = set()
-            for key, event in self._epoll.select():
-                multi = self._socket_multi_map[key.fd]
-                ev_bitmask = 0
-                if event & selectors.EVENT_READ:
-                    ev_bitmask |= pycurl.CSELECT_IN
-                if event & selectors.EVENT_WRITE:
-                    ev_bitmask |= pycurl.CSELECT_OUT
-                code, remaining = multi.socket_action(key.fd, ev_bitmask)
-                multis_to_finish.add(multi)
-            for multi in multis_to_finish:
-                self._finish(multi)
-        self._perform_running = False
 
     def _timeout(self, multi):
         ret, num_handles = multi.socket_action(pycurl.SOCKET_TIMEOUT, 0)
