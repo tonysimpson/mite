@@ -9,7 +9,6 @@ from human_curl import Request
 logger = logging.getLogger(__name__)
 
 
-
 def get_metrics(creq):
     return {
         'redirect_count': creq.getinfo(pycurl.REDIRECT_COUNT),
@@ -32,7 +31,6 @@ class BaseProfile:
     connection_timeout = 60
     user_agent = None
     dns_servers = None
-
 
 
 class session:
@@ -85,10 +83,8 @@ class session:
         self._close()
 
 
-
 class RequestError(Exception):
     pass
-
 
 
 _PYCURL_ERROR_CODES = {getattr(pycurl, name): name[2:] for name in dir(pycurl) if name.startswith('E_')}

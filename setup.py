@@ -6,6 +6,8 @@ setup(
         version='0.0.1a0',
         install_requires=[
             'docopt',
-            'msgpack-python'
+            'msgpack-python',
+            'human_curl',
+            'pycurl'
         ]
 )

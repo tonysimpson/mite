@@ -1,17 +1,7 @@
-from .session import SessionController
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
-from re import compile as re_compile, IGNORECASE
+from re import compile as re_compile, IGNORECASE, escape
 import asyncio
-
-
-class BrowserController(SessionController):
-    """Thin wrapper around a Session controller, provides a method to spin up browsers."""
-    def __init__(self):
-        super().__init__()
-
-    def create_new_browser(self, profile=None, metrics_callback=None):
-        return Browser(self.create_new_session(profile=profile, metrics_callback=metrics_callback))
 
 
 class Browser:
@@ -46,7 +36,21 @@ class Resource:
         self.response = response
 
 
-class Page(Resource):
+class ContainerMixin:
+    """Mixin for things which need to find elements within themselves"""
+    @staticmethod
+    def _get_element(root_elem, name=None, attrs=None, text=None, **kwargs):
+        # Bs4 text doesn't work with other finders according to robobrowser so split off.
+        matches = root_elem.find_all(name, attrs, True, None, **kwargs)
+        if not text:
+            return matches[0]
+        text = re_compile(escape(text), IGNORECASE)
+        for match in matches:
+            if text.search(match.text):
+                return match
+
+
+class Page(Resource, ContainerMixin):
     """Page object built from a HTML response."""
     def __init__(self, response):
         super().__init__(response)
@@ -101,11 +105,8 @@ class Page(Resource):
     async def on_dom_ready(self):
         pass
 
-    # Page load
-    # Form filling
-    # Link following
-    # Add classes for different resources
-    # awaitable dom ready
+    def get_form(self, attrs=None, text=None, **kwargs):
+        return Form(self._get_element(self.dom, 'form', attrs, text, **kwargs))
 
 
 class Script(Resource):
@@ -126,5 +127,51 @@ class Stylesheet(Resource):
             yield urljoin(base_url, match)
 
 
-class Form:
+class Form(ContainerMixin):
+    def __init__(self, element):
+        self.element = element
+        self.method = element['method']
+        self.action = element['action']
+        self.fields = self._extract_fields()
+
+    def _extract_fields(self):
+        return self.element.find_all(['input, textarea, select'])
+
+    def do_action(self):
+        # Whose responsibility is this?
+        pass
+
+    def _serialize(self):
+        return {f.name: f.value for f in self.fields}
+
+
+class BaseFormField:
+    def __init__(self, element):
+        self.element = element
+        self.name = element['name']
+        self.value = element['value']
+
+    def _set_value(self, value):
+        self.value = value
+
+
+class SelectField(BaseFormField):
     pass
+
+
+class CheckboxField(BaseFormField):
+    pass
+
+
+class RadioField(BaseFormField):
+    pass
+
+
+class FileInputField(BaseFormField):
+    pass
+
+# Page load
+# Form filling
+# Link following
+# Add classes for different resources
+# awaitable dom ready
