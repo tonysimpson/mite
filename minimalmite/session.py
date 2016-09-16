@@ -1,8 +1,5 @@
 import pycurl
 import asyncio
-import selectors
-import urllib
-from io import BytesIO
 import time
 import logging
 from functools import partial
