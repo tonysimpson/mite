@@ -21,14 +21,11 @@ class Browser:
 
     async def _download_resource(self, url, page, type):
         """Download a resource and then register it with the page it came from."""
-        print(url)
         resource = await self._session.request('GET', url)
         page._register_resource(resource, type)
-        # print('Registered')
 
     async def _download_resources(self, page):
         """Downloads embedded resources, will do this recursively when content like iframes are present"""
-        print("Page", page.response.url)
         await asyncio.gather(*[self._download_resource(url, page, rtype)
             for url, rtype in page._extract_embeded_urls()])
         await asyncio.gather(*[self._download_resources(subpage) for subpage in page.resources_with_embedabbles])
@@ -65,7 +62,6 @@ class Page(Resource):
         return self.frames + self.stylesheets
 
     def _register_resource(self, response, rtype):
-        print(response.url, rtype)
         if rtype == 'resource':
             self.resources.append(Resource(response))
         elif rtype == 'script':
