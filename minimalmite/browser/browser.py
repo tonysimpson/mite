@@ -24,20 +24,22 @@ class Browser:
         """Perform a request and return a page object"""
         # Wrap everything in page object
         resp = await self._session.request(method, url, *args, **kwargs)
-        page = Page(resp)
+        page = Page(resp, self)
         if embedded_res:
             await self._download_resources(page)
         return page
 
 
 class Resource:
-    """Base class for web resources. Doesn't do much right now."""
-    def __init__(self, response):
+    """Base class for web resources"""
+    def __init__(self, response, browser):
         self.response = response
+        self.browser = browser
 
 
 class ContainerMixin:
     """Mixin for things which need to find elements within themselves"""
+
     @staticmethod
     def _get_element(root_elem, name=None, attrs=None, text=None, **kwargs):
         # Bs4 text doesn't work with other finders according to robobrowser so split off.
@@ -52,8 +54,8 @@ class ContainerMixin:
 
 class Page(Resource, ContainerMixin):
     """Page object built from a HTML response."""
-    def __init__(self, response):
-        super().__init__(response)
+    def __init__(self, response, browser):
+        super().__init__(response, browser)
         self.dom = BeautifulSoup(response.text, "html.parser")
         self.scripts = []
         self.stylesheets = []
@@ -106,7 +108,7 @@ class Page(Resource, ContainerMixin):
         pass
 
     def get_form(self, attrs=None, text=None, **kwargs):
-        return Form(self._get_element(self.dom, 'form', attrs, text, **kwargs))
+        return Form(self._get_element(self.dom, 'form', attrs, text, **kwargs), self)
 
 
 class Script(Resource):
@@ -128,47 +130,159 @@ class Stylesheet(Resource):
 
 
 class Form(ContainerMixin):
-    def __init__(self, element):
+    def __init__(self, element, page):
+        self._page = page
         self.element = element
-        self.method = element['method']
-        self.action = element['action']
-        self.fields = self._extract_fields()
+        self.method = element.get('method')
+        self.action = element.get('action')
+        self.fields = {}
+        self.files = {}
+        self._set_fields()
 
-    def _extract_fields(self):
-        return self.element.find_all(['input, textarea, select'])
-
-    def do_action(self):
-        # Whose responsibility is this?
-        pass
+    def _set_fields(self):
+        for f in self._extract_fields_as_subtype():
+            if isinstance(f, FileInputField):
+                self.files[f.name] = f
+            else:
+                self.fields[f.name] = f
 
     def _serialize(self):
-        return {f.name: f.value for f in self.fields}
+        return {'data': {name: f.value for name, f in self.fields.items() if not f.disabled},
+                'files': [(name, v) for name, f in self.files.items() for v in f.value if not f.disabled]}
+
+    def _extract_fields_as_subtype(self):
+        fields = self.element.find_all(['select', 'textarea', 'input'])
+        while fields:
+            field = fields.pop()
+            if field.name == 'select':
+                yield SelectField(field)
+            elif field.name == 'textarea':
+                yield BaseFormField(field)
+            elif field.name == 'input':
+                if field.attrs['type'] in ['reset', 'submit']:
+                    continue
+                elif field.attrs['type'] == 'file':
+                    yield FileInputField(field)
+                elif field.attrs['type'] == 'radio':
+                    radios = [f for f in fields[:] if f.attrs['name'] == field.attrs['name']]
+                    for r in radios:
+                        fields.remove(r)
+                    yield RadioField(radios)
+                elif field.attrs['type'] == 'checkbox':
+                    yield CheckboxField(field)
+                else:
+                    yield BaseFormField(field)
+
+    def __getitem__(self, item):
+        result = self.fields.get(item) or self.files.get(item)
+        if result:
+            return result
+        else:
+            raise KeyError("{} not in form fields".format(item))
+
+    def __setitem__(self, item, value):
+        if item in self.fields:
+            self.fields[item].value = value
+        elif item in self.files:
+            self.files[item].value = value
+        else:
+            raise KeyError("{} not in form fields".format(item))
+
+    async def submit(self, embedded_res=False):
+        return await self._page.browser.request(self.method, self.action, embedded_res=embedded_res, **self._serialize())
 
 
 class BaseFormField:
     def __init__(self, element):
         self.element = element
-        self.name = element['name']
-        self.value = element['value']
+        self.name = element.attrs.get('name')
+        self._value = element.attrs.get('value')
+        self._disabled = bool(element.get('disabled'))
 
-    def _set_value(self, value):
-        self.value = value
+    @property
+    def disabled(self):
+        return self._disabled
+
+    def enable(self):
+        self._disabled = False
+
+    def disable(self):
+        self._disabled = True
+
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, value):
+        self._value = value
 
 
 class SelectField(BaseFormField):
-    pass
+    def __init__(self, element):
+        super().__init__(element)
+        self.options = element.find_all('option')
+
+    def _get_options(self):
+        if not self.options[-1].value:
+            return [o.text for o in self.options]
+        else:
+            return [o.value for o in self.options]
+
+    @BaseFormField.value.setter
+    def value(self, value):
+        if value in self.options:
+            self._value = value
+        else:
+            raise OptionError(value)
 
 
 class CheckboxField(BaseFormField):
-    pass
+    def __init__(self, element):
+        super().__init__(element)
+        self._checked = False
+
+    def toggle(self):
+        self._checked = not self._checked
+        return self._checked
+
+    @property
+    def disabled(self):
+        return self._disabled and (not self._checked)
 
 
-class RadioField(BaseFormField):
-    pass
+class RadioField:
+    """Radio fields are made up of multiple inputs with the same name but submit only one value."""
+    def __init__(self, elements):
+        self.elements = elements
+        self.name = elements[0].attrs.get('name')
+        self._value = elements[0].attrs.get('value')
+
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, value):
+        if value in [e.get('value') for e in self.elements]:
+            self._value = value
+        else:
+            raise OptionError(value)
 
 
 class FileInputField(BaseFormField):
-    pass
+    def __init__(self, element):
+        super().__init__(element)
+        self._value = []
+
+    @BaseFormField.value.setter
+    def value(self, file):
+        self._value.append(file)
+
+
+class OptionError(Exception):
+    def __init__(self, value):
+        self.message = "Option: {} not in radio or select field".format(value)
 
 # Page load
 # Form filling
