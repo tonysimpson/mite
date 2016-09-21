@@ -110,6 +110,10 @@ class Page(Resource, ContainerMixin):
     def get_form(self, attrs=None, text=None, **kwargs):
         return Form(self._get_element(self.dom, 'form', attrs, text, **kwargs), self)
 
+    async def click_link(self, attrs=None, text=None, **kwargs):
+        return await self.browser.request('GET', self._get_element(
+            self.dom, 'a', attrs=attrs, text=text, **kwargs).attrs['href'])
+
 
 class Script(Resource):
     def __init__(self, response):
