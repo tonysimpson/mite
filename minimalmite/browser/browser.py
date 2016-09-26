@@ -79,6 +79,7 @@ class Page(Resource, ContainerMixin):
 
     def _extract_embeded_urls(self):
         """Extracts all embedded resources from a page"""
+        # TODO: Look into prerender and whether we should be getting these resources.
         base_url = self.response.url
         for burl in self.dom.find_all('base', {'href': True}):
             base_url = burl.attrs['href'] # reset the base url to the one in the page
@@ -105,6 +106,7 @@ class Page(Resource, ContainerMixin):
                 base_url, re_compile("url\(\s*[\"'](.*)[\"']\s*\)", IGNORECASE).match(elem.attrs['style'])), 'resource'
 
     async def on_dom_ready(self):
+        # awaitable dom ready
         pass
 
     def get_form(self, attrs=None, text=None, **kwargs):
@@ -288,8 +290,4 @@ class OptionError(Exception):
     def __init__(self, value):
         self.message = "Option: {} not in radio or select field".format(value)
 
-# Page load
-# Form filling
-# Link following
-# Add classes for different resources
-# awaitable dom ready
+
