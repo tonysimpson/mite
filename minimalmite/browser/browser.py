@@ -2,6 +2,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from re import compile as re_compile, IGNORECASE, escape
 import asyncio
+from minimalmite.exceptions import OptionError
 
 
 class Browser:
@@ -285,9 +286,5 @@ class FileInputField(BaseFormField):
     def value(self, file):
         self._value.append(file)
 
-
-class OptionError(Exception):
-    def __init__(self, value):
-        self.message = "Option: {} not in radio or select field".format(value)
 
 
