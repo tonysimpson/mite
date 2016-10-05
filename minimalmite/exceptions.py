@@ -7,3 +7,7 @@ class OptionError(Exception):
 class TestEnd(Exception):
     def __init__(self):
         pass
+
+
+class RequestError(Exception):
+    pass

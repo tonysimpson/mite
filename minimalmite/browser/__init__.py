@@ -7,5 +7,5 @@ class BrowserController(SessionController):
     def __init__(self):
         super().__init__()
 
-    def create_new_browser(self, profile=None, metrics_callback=None):
+    def create_new_session(self, profile=None, metrics_callback=None):
         return Browser(self.create_new_session(profile=profile, metrics_callback=metrics_callback))

@@ -4,7 +4,7 @@ import time
 import logging
 from functools import partial
 from human_curl import Request
-
+from minimalmite.exceptions import RequestError
 
 logger = logging.getLogger(__name__)
 
@@ -82,9 +82,6 @@ class session:
     def __del__(self):
         self._close()
 
-
-class RequestError(Exception):
-    pass
 
 
 _PYCURL_ERROR_CODES = {getattr(pycurl, name): name[2:] for name in dir(pycurl) if name.startswith('E_')}
