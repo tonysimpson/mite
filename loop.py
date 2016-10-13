@@ -4,8 +4,8 @@ import asyncio
 import logging
 import sys
 import msgpack
+from pympler.tracker import SummaryTracker
 
-controller = minimalmite.SessionController()
 logging.basicConfig()#level=logging.DEBUG)
 
 
@@ -16,13 +16,13 @@ N = int(sys.argv[2])
 packer = msgpack.Packer()
 
 async def test():
-    session = controller.create_new_session() #metrics_callback=lambda d: results_file.write(packer.pack(d)))
-    for i in range(N):
-        try:
-            await session.request('GET', 'http://127.0.0.1:9003')
-        except Exception as e:
-            print('error:', repr(e))
+    session = minimalmite.Session()
+    try:
+        await asyncio.gather(*[session.request('GET', 'http://127.0.0.1:9003') for i in range(N)])
+    except Exception as e:
+        print('error:', repr(e))
     print(N / (time.time() - st))
+    await session.wait_for_done()
 
 loop = asyncio.get_event_loop()
 st = time.time()
