@@ -1,2 +1,2 @@
-from .session import SessionController
-from .browser import BrowserController
+from .session import Session
+from .browser import Browser
