@@ -1,3 +1,4 @@
+from collections import Counter
 from importlib import import_module
 
 from minimalmite.protocols import NanomsgProtocol
@@ -18,14 +19,20 @@ class VolumeController:
         self.main_loop()
 
     def update_volumes(self):
-        identifier, async_jobs, sync_jobs, killed_actions, capacity = self.executor_channel.receive().split()
-        self.executors[identifier] = [async_jobs, sync_jobs, killed_actions, capacity]
+        identifier, jobs, killed_actions, capacity = self.executor_channel.receive().split()
+        self.executors[identifier] = [Counter(jobs), killed_actions, capacity]
+
+    def current_volumes_by_action(self):
+        return sum([e[0] for e in self.executors.values()])
 
     def add_vms(self, package, scenario):
-        getattr(import_module('{}.scenarios'.format(package)), scenario)(self)
+        getattr(import_module(scenario, '{}.scenarios'.format(package)))(self)
 
     def add_vm(self, vm):
         self.vms.append(vm)
+
+    def remove_vm(self, vm):
+        self.vms.remove(vm)
 
     def send_job(self, journey, package, *args, **kwargs):
         msg = {"identifier": self.allocator.allocate(),
@@ -33,10 +40,18 @@ class VolumeController:
                "package": package,
                "args": args,
                "kwargs": kwargs}
+        # To prevent over-allocation, will be corrected upon next receive from executor
+        # Crappy and I hate it, think of better solution
+        self.executors[msg["identifier"]][2] -= 1
         self.executor_channel.send(msg)
 
-    def calculate_required_volume(self):
-        return sum([vm.current_required() for vm in self.vms])
+    def calculate_required_volumes(self):
+        c = self.current_volumes_by_action()
+        for vm in self.vms:
+            yield vm, vm.current_required() - c[vm.identifier]
 
     def main_loop(self):
-        pass
+        while self.vms:
+            self.update_volumes()
+            for vm, required in self.calculate_required_volumes():
+                self.send_job(*next(vm))

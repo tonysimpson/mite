@@ -1,3 +1,5 @@
+from minimalmite.exceptions import UnallocatableError
+
 
 class RoundRobinAllocator:
     def __init__(self, vc):
@@ -16,8 +18,8 @@ class FewestJobsAllocator:
         try:
             executors = filter(
                 self.vc.executors().items(),
-                lambda x: x[1][4] != 0 and x[0] not in self.vc.banned_executors
+                lambda x: x[1][4] > 0 and x[0] not in self.vc.banned_executors
             )
             return min(executors, key=lambda x: x[1][4])[0]
         except ValueError:
-            return None
+            raise UnallocatableError(self)

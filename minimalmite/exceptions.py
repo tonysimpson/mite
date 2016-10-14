@@ -11,3 +11,8 @@ class TestEnd(Exception):
 
 class RequestError(Exception):
     pass
+
+
+class UnallocatableError(Exception):
+    def __init__(self, allocator):
+        self.message = "Allocator: {} can't allocate actions to executors".format(allocator)
