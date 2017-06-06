@@ -4,7 +4,7 @@ import time
 import logging
 from human_curl import Request
 import weakref
-
+from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +39,7 @@ class RequestError(Exception):
 
 _PYCURL_ERROR_CODES = {getattr(pycurl, name): name[2:] for name in dir(pycurl) if name.startswith('E_') and not name.startswith('E_MULTI_')}
 
+_DEFAULT_SOCKET_ACTION_THREAD_POOL_EXECUTOR = ThreadPoolExecutor()
 
 
 class WeakRefUnboundMethodProxy:
@@ -51,7 +52,9 @@ class WeakRefUnboundMethodProxy:
 
 
 class Session:
-    def __init__(self, headers=None, cookies=None, user_agent=None, dns_servers=None, profile=None, metrics_callback=None, loop=None,):
+    def __init__(self, headers=None, cookies=None, user_agent=None, 
+            dns_servers=None, profile=None, metrics_callback=None, loop=None, 
+            socket_action_executor=None):
         if headers is None:
             headers = {}
         self.headers = headers
@@ -70,20 +73,26 @@ class Session:
         self._multi = pycurl.CurlMulti()
         self._multi.setopt(pycurl.M_SOCKETFUNCTION, WeakRefUnboundMethodProxy(self, Session._socket_call_back))
         self._multi.setopt(pycurl.M_TIMERFUNCTION, WeakRefUnboundMethodProxy(self, Session._timer_call_back))
-        self._working = False
         self._shared_handle = pycurl.CurlShare()
         self._shared_handle.setopt(pycurl.SH_SHARE, pycurl.LOCK_DATA_COOKIE)
         self._shared_handle.setopt(pycurl.SH_SHARE, pycurl.LOCK_DATA_DNS)
         self._num_handles = 0
+        if socket_action_executor is None:
+            socket_action_executor = _DEFAULT_SOCKET_ACTION_THREAD_POOL_EXECUTOR
+        self._socket_action_executor = socket_action_executor
+        self._scheduled_socket_actions = {}
 
+    @property
     def done(self):
         return self._done is None or self._done.done()
 
     async def wait_for_done(self):
-        if not self.done():
+        logger.debug('called %r.wait_for_done', self)
+        if not self.done:
             await self._done
 
     async def request(self, method, url, **kwargs):
+        logger.debug('called %r.request', self)
         headers =  dict(self.headers)
         headers.update(kwargs.get('headers', {}))
         if self.user_agent is not None:
@@ -109,21 +118,34 @@ class Session:
         return request.make_response()
 
     def _shutdown(self):
+        logger.debug('called %r._shutdown %r', self, self._done)
         self._done.set_result(None)
         if self._timeout_handle is not None:
             self._timeout_handle.cancel()
             self._timeout_handle = None
-        self._working = False
 
-    def _socket_action(self, fd, bitmask):
-        code, num_handles = self._multi.socket_action(fd, bitmask)
+    def _socket_action_job(self, socket, bitmask):
+        logger.debug('called %r._socket_action_job', self)
+        code, num_handles = self._multi.socket_action(socket, bitmask)
         if self._num_handles > num_handles:
-            self._finish()
+            self._loop.call_soon_threadsafe(self._finish)
         self._num_handles = num_handles
         if num_handles == 0:
-            self._shutdown()
+            self._loop.call_soon_threadsafe(self._shutdown)
+
+    def _socket_action_called_soon(self, socket, bitmask):
+        self._socket_action_executor.submit(self._socket_action_job, socket, bitmask)
+
+    def _socket_action(self, socket, bitmask):
+        logger.debug('called %r._socket_action', self)
+        key = (socket, bitmask)
+        if key in self._scheduled_socket_actions:
+            handle = self._scheduled_socket_actions[key]
+            handle.cancel()
+        self._scheduled_socket_actions[key] = self._loop.call_soon(self._socket_action_called_soon, socket, bitmask)
 
     def _finish(self):
+        logger.debug('called %r._finish', self)
         num_msgs, successes, errors = self._multi.info_read()
         for success in successes:
             future = self._futures.pop(success)
@@ -136,6 +158,7 @@ class Session:
             self._multi.remove_handle(errored)
 
     def _socket_call_back(self, event, socket, multi, data):
+        logger.debug('called %r._socket_call_back %s', self, event)
         if event == pycurl.POLL_IN:
             self._loop.add_reader(socket, self._socket_action, socket, pycurl.CSELECT_IN)
         elif event == pycurl.POLL_OUT:
@@ -146,13 +169,19 @@ class Session:
         elif event == pycurl.POLL_REMOVE:
             self._loop.remove_reader(socket)
             self._loop.remove_writer(socket)
+            if (socket, pycurl.CSELECT_IN) in self._scheduled_socket_actions:
+                del self._scheduled_socket_actions[(socket, pycurl.CSELECT_IN)]
+            if (socket, pycurl.CSELECT_OUT) in self._scheduled_socket_actions:
+                del self._scheduled_socket_actions[(socket, pycurl.CSELECT_OUT)]
         else:
             raise AssertionError("unhandled event type %r" % event)
 
     def _timeout(self):
+        logger.debug('called %r._timeout', self)
         self._socket_action(pycurl.SOCKET_TIMEOUT, 0)
 
     def _timer_call_back(self, milliseconds):
+        logger.debug('called %r._timer_call_back', self)
         if self._timeout_handle is not None:
             self._timeout_handle.cancel()
             self._timeout_handle = None
@@ -160,11 +189,12 @@ class Session:
             self._timeout_handle = self._loop.call_later(milliseconds / 1000, self._timeout)
 
     def _perform(self, handle):
+        logger.debug('called %r._perform', self)
         future = asyncio.Future()
         self._futures[handle] = future
         self._multi.add_handle(handle)
         self._num_handles += 1
-        if self.done():
+        if self.done:
             self._done = asyncio.Future()
             self._timeout()
         return future
