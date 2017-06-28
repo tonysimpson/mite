@@ -1,2 +1,51 @@
 from .session import Session
 from .browser import Browser
+
+
+import time
+import asyncio
+import random
+
+
+
+class ensure_seperation_from_callable:
+    def __init__(self, sep_callable, loop=None:
+        self._sep_callable = sep_callable
+        self._loop = loop
+
+    async def __aenter__(self):
+        self._start = time.time()
+
+    def __enter__(self):
+        self._start = time.time()
+
+    def _sleep_time(self):
+        sleep_time = self._sep_callable() - (time.time() - self._start)
+        
+    async def __aexit__(self, *args):
+        if self._loop is None:
+            self._loop = asyncio.get_event_loop()
+        sleep_time = self._sleep_time()
+        if self._sleep_time() > 0:
+            await asyncio.sleep(sleep_time, loop=self._loop)
+        
+    def __exit__(self, *args):
+        sleep_time = self._sleep_time()
+        if self._sleep_time() > 0:
+            time.sleep(sleep_time)
+
+
+def ensure_fixed_seperation(seperation, loop=None:
+    def fixed_seperation():
+        return seperation
+    return ensure_seperation_from_callable(fixed_seperation, loop=loop)
+
+
+def ensure_average_seperation(mean_seperation, std_dev=None, loop=None:
+    if std_dev is None:
+        std_dev = mean_seperation * .1
+    def average_seperation():
+        return random.gauss(mean_seperation, std_dev)
+    return ensure_seperation_from_callable(average_seperation, loop=loop)
+
+

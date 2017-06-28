@@ -108,6 +108,18 @@ class Session:
             self._metrics_callback(metrics)
         return request.make_response()
 
+    async def get(self, url, **kwargs):
+        return await self.request('GET', url, **kwargs)
+
+    async def post(self, url, **kwargs):
+        return await self.request('POST', url, **kwargs)
+
+    async def put(self, url, **kwargs):
+        return await self.request('PUT', url, **kwargs)
+
+    async def delete(self, url, **kwargs):
+        return await self.request('DELETE', url, **kwargs)
+
     def _shutdown(self):
         self._done.set_result(None)
         if self._timeout_handle is not None:
