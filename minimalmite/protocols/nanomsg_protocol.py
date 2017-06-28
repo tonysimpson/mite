@@ -8,6 +8,8 @@ from nanomsg import (
     SURVEYOR_DEADLINE,
 )
 
+import msgpack
+
 
 class NanomsgProtocol:
     def __init__(self):
@@ -40,7 +42,7 @@ class NanomsgProtocol:
         self.socket.connect('tcp//{}:{}'.format(self.vc_location, self.port))
 
     def send(self, message):
-        self.socket.send(message)
+        self.socket.send(msgpack.packb(message))
 
     def receive(self):
-        return self.socket.recv()
+        return msgpack.unpackb(self.socket.recv())
