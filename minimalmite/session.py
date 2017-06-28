@@ -120,6 +120,12 @@ class Session:
     async def delete(self, url, **kwargs):
         return await self.request('DELETE', url, **kwargs)
 
+    async def options(self, url, **kwargs):
+        return await self.request('OPTIONS', url, **kwargs)
+
+    async def head(self, url, **kwargs):
+        return await self.request('HEAD', url, **kwargs)
+
     def _shutdown(self):
         self._done.set_result(None)
         if self._timeout_handle is not None:
