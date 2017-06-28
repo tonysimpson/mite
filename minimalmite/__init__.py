@@ -9,7 +9,7 @@ import random
 
 
 class ensure_seperation_from_callable:
-    def __init__(self, sep_callable, loop=None:
+    def __init__(self, sep_callable, loop=None):
         self._sep_callable = sep_callable
         self._loop = loop
 
@@ -35,13 +35,13 @@ class ensure_seperation_from_callable:
             time.sleep(sleep_time)
 
 
-def ensure_fixed_seperation(seperation, loop=None:
+def ensure_fixed_seperation(seperation, loop=None):
     def fixed_seperation():
         return seperation
     return ensure_seperation_from_callable(fixed_seperation, loop=loop)
 
 
-def ensure_average_seperation(mean_seperation, std_dev=None, loop=None:
+def ensure_average_seperation(mean_seperation, std_dev=None, loop=None):
     if std_dev is None:
         std_dev = mean_seperation * .1
     def average_seperation():
