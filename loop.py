@@ -17,16 +17,13 @@ packer = msgpack.Packer()
 
 async def test():
     session = minimalmite.Session()
-    done, pending = await asyncio.wait([session.request('GET', 'http://127.0.0.1:9003') for i in range(N)])
-    i = 0
-    for f in done:
-        try:
-            f.result()
-            i += 1
-        except Exception as e:
-            print('error:', repr(e))
-    print(N / (time.time() - st), 'Errors:', N - i)
+    try:
+        await asyncio.gather(*[session.request('GET', 'http://127.0.0.1:9003') for i in range(N)])
+    except Exception as e:
+        print('error:', repr(e))
+    print(N / (time.time() - st))
     await session.wait_for_done()
+
 loop = asyncio.get_event_loop()
 st = time.time()
 loop.run_until_complete(asyncio.wait([test() for i in range(S)]))
