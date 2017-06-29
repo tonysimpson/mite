@@ -20,7 +20,7 @@ class ensure_seperation_from_callable:
         self._start = time.time()
 
     def _sleep_time(self):
-        sleep_time = self._sep_callable() - (time.time() - self._start)
+        return self._sep_callable() - (time.time() - self._start)
         
     async def __aexit__(self, *args):
         if self._loop is None:
@@ -41,11 +41,11 @@ def ensure_fixed_seperation(seperation, loop=None):
     return ensure_seperation_from_callable(fixed_seperation, loop=loop)
 
 
-def ensure_average_seperation(mean_seperation, std_dev=None, loop=None):
-    if std_dev is None:
-        std_dev = mean_seperation * .1
+def ensure_average_seperation(mean_seperation, plus_minus=None, loop=None):
+    if plus_minus is None:
+        plus_minus = mean_seperation * .25
     def average_seperation():
-        return random.gauss(mean_seperation, std_dev)
+        return mean_seperation + (random.random() * plus_minus * 2) - plus_minus
     return ensure_seperation_from_callable(average_seperation, loop=loop)
 
 
