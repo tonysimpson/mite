@@ -1,11 +1,12 @@
 from .session import Session
 from .browser import Browser
 
+from .exceptions import UnexpectedResponseCodeError
 
 import time
 import asyncio
 import random
-
+import string
 
 
 class ensure_seperation_from_callable:
@@ -49,3 +50,14 @@ def ensure_average_seperation(mean_seperation, plus_minus=None, loop=None):
     return ensure_seperation_from_callable(average_seperation, loop=loop)
 
 
+def check_status_code(resp, expected):
+    if resp.status_code != expected:
+        raise UnexpectedResponseCodeError(expected, resp)
+
+
+def random_name(length=10):
+    return ''.join([random.choice(string.ascii_lowercase) for _ in range(length)]).capitalize()
+
+
+def random_phone_number(country_code='+44'):
+    return '{}{}'.format(country_code, ''.join([random.choice(string.digits) for _ in range(10)]))
