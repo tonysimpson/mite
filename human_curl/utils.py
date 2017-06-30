@@ -144,7 +144,6 @@ class CaseInsensitiveDict(collections.MutableMapping):
         return str(dict(self.items()))
 
 
-
 def from_cookiejar(cookiejar):
     """Extract cookies dict from cookiejar
 
