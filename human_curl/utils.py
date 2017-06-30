@@ -78,7 +78,7 @@ class CaseInsensitiveDict(dict):
 
     def __init__(self, *args, **kwargs):
         tmp_d = dict(*args, **kwargs)
-        super(CaseInsensitiveDict, self).__init__([(k.lower(), v) for k, v in tmp_d.items()])
+        super(CaseInsensitiveDict, self).__init__([(k, v) for k, v in tmp_d.items()])
 
     def __setitem__(self, key, value):
         super(CaseInsensitiveDict, self).__setitem__(key.lower(), value)
@@ -96,7 +96,7 @@ class CaseInsensitiveDict(dict):
         return super(CaseInsensitiveDict, self).has_key(key.lower())
 
     def items(self):
-        return ((capwords(k, '-'), v) for k, v in super(CaseInsensitiveDict, self).items())
+        return ((k, v) for k, v in super(CaseInsensitiveDict, self).items())
 
 
 def from_cookiejar(cookiejar):
