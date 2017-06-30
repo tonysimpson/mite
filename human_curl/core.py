@@ -15,7 +15,6 @@ import time
 from os.path import exists as file_exists
 from logging import getLogger
 from re import compile as re_compile
-from string import capwords
 from itertools import chain
 from http.cookiejar import CookieJar
 from http.cookies import SimpleCookie, CookieError
@@ -326,7 +325,7 @@ class Request(object):
             opener.unsetopt(pycurl.USERPWD)
 
         if self._headers:
-            opener.setopt(pycurl.HTTPHEADER, ["%s: %s" % (capwords(f, "-"), v) for f, v
+            opener.setopt(pycurl.HTTPHEADER, ["%s: %s" % (f, v) for f, v
                                               in CaseInsensitiveDict(self._headers).items()])
 
         # Option -L  Follow  "Location: "  hints
