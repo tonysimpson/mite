@@ -2,6 +2,7 @@
 
 from setuptools import setup
 
+
 def run_tests():
     from tests import suite
     return suite()
