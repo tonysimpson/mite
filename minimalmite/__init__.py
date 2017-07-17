@@ -8,6 +8,8 @@ import asyncio
 import random
 import string
 
+from urllib.parse import urlencode
+
 
 class ensure_seperation_from_callable:
     def __init__(self, sep_callable, loop=None):
@@ -60,4 +62,23 @@ def random_name(length=10):
 
 
 def random_phone_number(country_code='+44'):
-    return '{}{}'.format(country_code, ''.join([random.choice(string.digits) for _ in range(10)]))
+    return ''.join(country_code, ''.join([random.choice(string.digits) for _ in range(10)]))
+
+
+def url_builder(base_url, *args, **kwargs):
+    new_args = []
+    if args:
+        url = base_url[:-1] if base_url.endswith('/') else base_url
+        for arg in args:
+            if arg.endswith('/') and arg != args[-1]:
+                arg = arg[:-1]
+            if not arg.startswith('/'):
+                arg = ''.join(['/', arg])
+            new_args.append(arg)
+        url = ''.join([url, ''.join(new_args)])
+    else:
+        url = base_url
+    if kwargs:
+        url = ''.join([url, '?', urlencode(kwargs)])
+    return url
+
