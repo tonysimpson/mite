@@ -444,9 +444,9 @@ class Request(object):
                                 self._method)
 
         # Responses without body
-        if self._method in ("OPTIONS", "HEAD", "DELETE"):
+        if self._method in ("OPTIONS", "HEAD"):
             opener.setopt(pycurl.NOBODY, True)
-        if self._method in ("POST", "PUT"):
+        if self._method in ("POST", "PUT", "DELETE"):
 
             if self._files is not None:
                 post_params = self._files

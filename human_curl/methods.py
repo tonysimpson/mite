@@ -134,11 +134,12 @@ def patch(url, data='', **kwargs):
     return request("PATCH", url, data=data, **kwargs)
 
 
-def delete(url, data="", **kwargs):
+def delete(url, data='', **kwargs):
     """Sends a DELETE request. Returns :class: `Response` object.
 
     Arguments:
     - `url`: Resource url
+    - `data`: delete data
     """
     return request("DELETE", url, data=data, **kwargs)
 
