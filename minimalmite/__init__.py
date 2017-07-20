@@ -47,8 +47,10 @@ async def ensure_fixed_seperation(seperation, loop=None):
 async def ensure_average_seperation(mean_seperation, plus_minus=None, loop=None):
     if plus_minus is None:
         plus_minus = mean_seperation * .25
+
     def average_seperation():
         return mean_seperation + (random.random() * plus_minus * 2) - plus_minus
+
     return ensure_seperation_from_callable(average_seperation, loop=loop)
 
 
@@ -62,7 +64,7 @@ def random_name(length=10):
 
 
 def random_phone_number(country_code='+44'):
-    return ''.join(country_code, ''.join([random.choice(string.digits) for _ in range(10)]))
+    return ''.join([country_code, ''.join([random.choice(string.digits) for _ in range(10)])])
 
 
 def url_builder(base_url, *args, **kwargs):
