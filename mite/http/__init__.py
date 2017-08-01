@@ -2,7 +2,7 @@ import pycurl
 import asyncio
 import time
 import logging
-from human_curl import Request
+from .human_curl import Request
 import weakref
 
 
