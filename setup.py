@@ -7,8 +7,8 @@ def run_tests():
     return suite()
 
 setup(
-    name = 'minimalmite',
-    packages=['human_curl', 'minimalmite'],
+    name = 'mite',
+    packages=['human_curl', 'mite'],
     version='0.0.1a0',
     install_requires=[
         'docopt',
@@ -19,7 +19,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'minimalmite = minimalmite.commands:main',
+            'mite = mite.commands:main',
         ],
     },
     test_suite = '__main__.run_tests'

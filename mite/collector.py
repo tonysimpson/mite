@@ -1,5 +1,5 @@
 from datetime import datetime
-from minimalmite.protocols import NanomsgProtocol
+from mite.protocols import NanomsgProtocol
 
 
 class Collector:

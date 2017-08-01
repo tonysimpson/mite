@@ -1,4 +1,4 @@
-import minimalmite
+import mite
 import time
 import asyncio
 import logging
@@ -16,7 +16,7 @@ N = int(sys.argv[2])
 packer = msgpack.Packer()
 
 async def test():
-    session = minimalmite.Session()
+    session = mite.Session()
     try:
         await asyncio.gather(*[session.request('GET', 'http://127.0.0.1:9003') for i in range(N)])
     except Exception as e:

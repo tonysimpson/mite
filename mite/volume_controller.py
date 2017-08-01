@@ -1,8 +1,8 @@
 from collections import Counter
 from importlib import import_module
 
-from minimalmite.protocols import NanomsgProtocol
-from minimalmite.allocators import FewestJobsAllocator
+from mite.protocols import NanomsgProtocol
+from mite.allocators import FewestJobsAllocator
 
 
 class VolumeController:

@@ -2,7 +2,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from re import compile as re_compile, IGNORECASE, escape
 import asyncio
-from minimalmite.exceptions import OptionError
+from mite.exceptions import OptionError
 
 
 class Browser:

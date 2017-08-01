@@ -26,7 +26,7 @@ class ensure_seperation_from_callable:
         if self._loop is None:
             self._loop = asyncio.get_event_loop()
         sleep_time = self._sleep_time()
-        if self._sleep_time() > 0:
+        if sleep_time > 0:
             await asyncio.sleep(sleep_time, loop=self._loop)
         
     def __exit__(self, *args):

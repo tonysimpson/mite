@@ -3,7 +3,7 @@ import threading
 from importlib import import_module
 from random import choice
 from string import ascii_letters, digits
-from minimalmite.protocols import NanomsgProtocol
+from mite.protocols import NanomsgProtocol
 
 lock = threading.Lock()
 

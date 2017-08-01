@@ -1,5 +1,5 @@
 from logging import Handler, NOTSET, Filter
-#from minimalmite.journey import send
+#from mite.journey import send
 
 
 class NanomsgHandler(Handler):

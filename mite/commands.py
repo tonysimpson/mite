@@ -1,11 +1,11 @@
 """Minimalmite
 
 Usage:
-    minimalmite vc <package> <scenario> [--executor_port=<port>] [--collector_port=<port>]
+    mite vc <package> <scenario> [--executor_port=<port>] [--collector_port=<port>]
         [--collector_location=<location>]
-    minimalmite executor  [--vc_port=<port>] [--vc_location=<location>] [--collector_port=<port>]
+    mite executor  [--vc_port=<port>] [--vc_location=<location>] [--collector_port=<port>]
         [--collector_location=<location>] [--max_volume=<number>]
-    minimalmite collector [--listen_port=<port>]
+    mite collector [--listen_port=<port>]
 
 Options:
     --executor_port=<port>          Port for the volume controller to connect to the executors on [default: 9000]
@@ -18,9 +18,9 @@ Options:
 """
 
 from docopt import docopt
-from minimalmite.executor import Executor
-from minimalmite.volume_controller import VolumeController
-from minimalmite.collector import Collector
+from mite.executor import Executor
+from mite.volume_controller import VolumeController
+from mite.collector import Collector
 
 
 def main():

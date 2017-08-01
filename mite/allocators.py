@@ -1,4 +1,4 @@
-from minimalmite.exceptions import UnallocatableError
+from mite.exceptions import UnallocatableError
 
 
 class RoundRobinAllocator:

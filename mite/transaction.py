@@ -1,7 +1,7 @@
 from traceback import format_exception
 
-from minimalmite.journey import send
-from minimalmite.exceptions import TestEnd
+from mite.journey import send
+from mite.exceptions import TestEnd
 
 
 class _Transaction:
