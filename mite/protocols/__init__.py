@@ -1,1 +1,0 @@
-from mite.protocols.nanomsg_protocol import NanomsgProtocol
