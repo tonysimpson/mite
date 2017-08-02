@@ -321,8 +321,8 @@ class AsyncClient(object):
     def put(self, url, **kwargs):
         return self.method("put", url=url, **kwargs)
 
-    def delete(self, url, **kwargs):
-        return self.method("delete", url=url, **kwargs)
+    def delete(self, url, data='', **kwargs):
+        return self.method("delete", url=url, data=data, **kwargs)
 
     def __del__(self):
         """ Close deascriptors after object delete

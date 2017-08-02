@@ -84,7 +84,7 @@ class Session:
             await self._done
 
     async def request(self, method, url, **kwargs):
-        headers =  dict(self.headers)
+        headers = dict(self.headers)
         headers.update(kwargs.get('headers', {}))
         if self.user_agent is not None:
             headers['User-Agent'] = self.user_agent

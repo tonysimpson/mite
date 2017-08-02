@@ -1,7 +1,17 @@
+<<<<<<< HEAD:mite/__init__.py
+=======
+from .session import Session
+from .browser import Browser
+
+from .exceptions import UnexpectedResponseCodeError
+
+>>>>>>> d00128f66fe8c0d3d8e5abe6f3db2666a6a8b969:minimalmite/__init__.py
 import time
 import asyncio
 import random
+import string
 
+from urllib.parse import urlencode
 
 
 class ensure_seperation_from_callable:
@@ -31,17 +41,49 @@ class ensure_seperation_from_callable:
             time.sleep(sleep_time)
 
 
-def ensure_fixed_seperation(seperation, loop=None):
+async def ensure_fixed_seperation(seperation, loop=None):
     def fixed_seperation():
         return seperation
     return ensure_seperation_from_callable(fixed_seperation, loop=loop)
 
 
-def ensure_average_seperation(mean_seperation, plus_minus=None, loop=None):
+async def ensure_average_seperation(mean_seperation, plus_minus=None, loop=None):
     if plus_minus is None:
         plus_minus = mean_seperation * .25
+
     def average_seperation():
         return mean_seperation + (random.random() * plus_minus * 2) - plus_minus
+
     return ensure_seperation_from_callable(average_seperation, loop=loop)
 
+
+def check_status_code(resp, expected):
+    if resp.status_code != expected:
+        raise UnexpectedResponseCodeError(expected, resp)
+
+
+def random_name(length=10):
+    return ''.join([random.choice(string.ascii_lowercase) for _ in range(length)]).capitalize()
+
+
+def random_phone_number(country_code='+44'):
+    return ''.join([country_code, ''.join([random.choice(string.digits) for _ in range(10)])])
+
+
+def url_builder(base_url, *args, **kwargs):
+    new_args = []
+    if args:
+        url = base_url[:-1] if base_url.endswith('/') else base_url
+        for arg in args:
+            if arg.endswith('/') and arg != args[-1]:
+                arg = arg[:-1]
+            if not arg.startswith('/'):
+                arg = ''.join(['/', arg])
+            new_args.append(arg)
+        url = ''.join([url, ''.join(new_args)])
+    else:
+        url = base_url
+    if kwargs:
+        url = ''.join([url, '?', urlencode(kwargs)])
+    return url
 
