@@ -1,11 +1,3 @@
-<<<<<<< HEAD:mite/__init__.py
-=======
-from .session import Session
-from .browser import Browser
-
-from .exceptions import UnexpectedResponseCodeError
-
->>>>>>> d00128f66fe8c0d3d8e5abe6f3db2666a6a8b969:minimalmite/__init__.py
 import time
 import asyncio
 import random
