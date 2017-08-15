@@ -5,6 +5,8 @@ import string
 
 from urllib.parse import urlencode
 
+from .exceptions import UnexpectedResponseCodeError
+
 
 class ensure_seperation_from_callable:
     def __init__(self, sep_callable, loop=None):
