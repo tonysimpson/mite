@@ -11,7 +11,7 @@ Options:
     --control-socket=SOCKET         
 """
 
-from minimalmite.session import Session
+from mite.session import Session
 import asyncio
 import traceback
 import random
@@ -96,6 +96,12 @@ class UserSession:
             'stacktrace': stacktrace, 
             'type': 'exception'
         }
+        self._add_context_headers_and_time(msg)
+        self._send(msg)
+
+    def send_msg(self, type, content):
+        msg = dict(content)
+        msg['type'] = type;
         self._add_context_headers_and_time(msg)
         self._send(msg)
 

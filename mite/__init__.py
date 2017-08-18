@@ -35,13 +35,13 @@ class ensure_seperation_from_callable:
             time.sleep(sleep_time)
 
 
-async def ensure_fixed_seperation(seperation, loop=None):
+def ensure_fixed_seperation(seperation, loop=None):
     def fixed_seperation():
         return seperation
     return ensure_seperation_from_callable(fixed_seperation, loop=loop)
 
 
-async def ensure_average_seperation(mean_seperation, plus_minus=None, loop=None):
+def ensure_average_seperation(mean_seperation, plus_minus=None, loop=None):
     if plus_minus is None:
         plus_minus = mean_seperation * .25
 
