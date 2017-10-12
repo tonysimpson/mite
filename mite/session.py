@@ -58,7 +58,6 @@ class Session:
         else:
             return ''
 
-
     def _add_context_headers(self, msg):
         msg['journey'] = self._journey_name
         msg['test'] = self._test_name
@@ -70,8 +69,6 @@ class Session:
         msg['time'] = time.time()
 
     def _send(self, _type, content):
-
-
         self.send(msgpack.dumps(msg))
 
     def _error(self, stacktrace):
