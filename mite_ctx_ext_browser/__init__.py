@@ -6,4 +6,4 @@ def add_mixin(context):
 
 
 def get_ext():
-    return add_mixin, ['http']
+    return add_mixin, None, ['http']

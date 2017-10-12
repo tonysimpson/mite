@@ -6,4 +6,4 @@ def build(context):
     return el.session()
 
 def get_ext():
-    return build, None
+    return build, None, None
