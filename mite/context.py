@@ -1,5 +1,4 @@
-
-
+import importlib
 
 class _TransactionContextManager:
     def __init__(self, user_session, name):
@@ -90,7 +89,7 @@ def _flatten_extension_tree(tree, current=None):
     for ext, builder, extensions in tree:
         if extensions:
             _flatten_extension_tree(extensions, current)
-        current.append(ext, builder)
+        current.append((ext, builder))
     return current
 
 

@@ -30,6 +30,10 @@ def get_extensions(journey):
     return ['http']
 
 
+def call_async(func, *args):
+    return asyncio.get_event_loop().run_until_complete(func(*args))
+
+
 def run_journey_spec_standalone(journey_spec):
     journey = init_journey(journey_spec)
     data_pools = init_data_pools(journey)
