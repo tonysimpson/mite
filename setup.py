@@ -4,13 +4,16 @@ from setuptools import setup
 
 setup(
     name = 'mite',
-    packages=['mite'],
+    packages=[
+        'mite',
+        'mite_ctx_ext_http',
+        'mite_ctx_ext_browser'
+    ],
     version='0.0.1a0',
     install_requires=[
         'docopt',
         'msgpack-python',
-        'pycurl',
-        'chardet',
+        'acurl',
         'bs4',
         'nanomsg'
     ],
