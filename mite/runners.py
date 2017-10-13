@@ -39,7 +39,7 @@ def run_journey_spec_standalone(journey_spec):
     data_pools = init_data_pools(journey)
     config = init_config(journey)
     dpa = LocalDataPoolAccess(data_pools)
-    ctx = Context(print, dpa, config)
+    ctx = Context(print)
     extensions = get_extensions(journey)
     add_context_extensions(ctx, extensions)
     call_async(journey, ctx, ctx.args)

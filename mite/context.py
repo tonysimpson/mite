@@ -14,9 +14,8 @@ class _TransactionContextManager:
 
 
 class Context:
-    def __init__(self, send, config, data_pool_access, id_data=None):
+    def __init__(self, send, id_data=None):
         self._send = send
-        self.config = config
         if id_data is None:
             id_data = {}
         self._id_data = id_data
