@@ -4,8 +4,8 @@ Mite Load Test Framwwork.
 Usage: 
     mite scenario test [options] SCENARIO_SPEC
 
-Arguments:
-    SCENARIO_SPEC           Identifier for a scenario in the form package_path:callable_name
+rguments:
+    SCENARIO_SPEC           Identifier for a scenario in the form package_path:scenario_list
 
 Examples:
     mite scenario test mite.example:scenario

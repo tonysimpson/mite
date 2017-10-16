@@ -15,10 +15,12 @@ Scenario = namedtuple('Scenario', 'id journey_spec argument_datapool_id volumemo
 
 
 class ScenarioManager:
-    def __init__(self, datapool_manager, period=1):
+    def __init__(self, datapool_manager, start_delay=0, period=1):
         self._period = period
         self._scenario_id_gen = count(1)
         self._datapool_manager = datapool_manager
+        self._in_start = start_delay > 0
+        self._start_delay = start_delay
         self._start_time = time.time()
         self._current_period_end = 0
         self._required = {}
@@ -43,6 +45,12 @@ class ScenarioManager:
         logger.debug('ScenarioManager._update_required_and_period period_end=%r required=%r', self._current_period_end, self._required)
 
     def get_required_work(self):
+        if self._in_start:
+            if self._now() > self._start_delay:
+                self._in_start = False
+                self._start_time = time.time()
+            else:
+                return self._required
         now = self._now()
         if now >= self._current_period_end:
             self._update_required_and_period(self._current_period_end, int(now + self._period))
