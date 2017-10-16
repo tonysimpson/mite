@@ -1,4 +1,6 @@
 import importlib
+import time
+import traceback
 from unittest.mock import MagicMock
 
 class _TransactionContextManager:
@@ -67,10 +69,10 @@ class Context:
 
     def _end_transaction(self):
         msg= {}
-        name = self._transaction_names.pop()
         self._add_context_headers_and_time(msg)
         msg['type'] = 'end'
         self._send(msg)
+        name = self._transaction_names.pop()
 
     def send_msg(self, type, content):
         msg = dict(content)

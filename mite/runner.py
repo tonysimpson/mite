@@ -1,10 +1,14 @@
 import asyncio
-from .context import Context, add_context_extensions
-from .util import spec_import
 from itertools import count
 from collections import deque
 import time
+import logging
 
+from .context import Context, add_context_extensions
+from .utils import spec_import
+from . import MiteError
+
+logger = logging.getLogger(__name__)
 
 class TimeoutException(Exception):
     pass
@@ -53,7 +57,7 @@ class DataPoolProxy:
         if not self._getting_more:
             self._getting_more = True
             asyncio.ensure_future(self._get_more())
-        return future
+        return await future
 
     async def checkin(self, dpi):
         self._used.append(dpi)
@@ -61,6 +65,7 @@ class DataPoolProxy:
     def _create_waiting_future(self):
         future = asyncio.Future()
         self._waiting_queue.append((time.time() + self._timeout, future))
+        return future
 
     def _do_waiting_timeout(self):
         if not self._waiting_queue:
@@ -87,18 +92,20 @@ class DataPoolProxy:
 
     async def _get_more(self):
         while self._waiting_queue:
-            used = self._used
+            logger.debug('DataPoolProxy._get_more used=%r', self._used)
+            unused = await self._transport.checkin_and_checkout(self._runner_id, self._datapool_id, self._used)
             self._used = []
-            unused = _self._transport.checkin_and_checkout(self._runner_id, self._datapool_id, used)
+            logger.debug('DataPoolProxy._get_more unused=%r', unused)
             if unused is None:
                 self._stop = True
                 self._do_waiting_stop_all()
-                return
+                break
             self._unused = deque(unused)
             self._do_waiting_have_unused()
             self._do_waiting_timeout()
             if self._waiting_queue:
                 await asyncio.sleep(1)
+        self._getting_more = False
 
 
 class Runner:
@@ -110,20 +117,26 @@ class Runner:
         self._datapool_proxies = {}
 
     def _current_work(self):
+        logger.debug("current_work=%s" % (self._work,))
         return self._work
 
     async def run(self):
         self._id, self._test_name = await self._transport.initialise()
         self._base_id_data = {'test': self._test_name, 'runner_id': self._id}
+        logger.debug("Entering run loop")
         while True:
             work = await self._transport.request_work(self._id, self._current_work())
+            logger.debug("requested_work=%s", work)
             for id, journey_spec, argument_datapool_id, number, minimum_duration in work:
-                for i in range(number)
-                    asyncio.ensure_future(self._execute(id, journey_spec, argument_id, minimum_duration))
+                for i in range(number):
+                    asyncio.ensure_future(self._execute(id, journey_spec, argument_datapool_id, minimum_duration))
             await asyncio.sleep(1)
     
     def _inc_work(self, id):
-        self._work[id] += 1
+        if id in self._work:
+            self._work[id] += 1
+        else:
+             self._work[id] = 1
 
     def _dec_work(self, id):
         self._work[id] -= 1
@@ -134,32 +147,39 @@ class Runner:
         start_time = time.time()
         journey = spec_import(journey_spec)
         id_data = {'journey': journey_spec}
-        id_data.update(self._id_data)
+        id_data.update(self._base_id_data)
         self._inc_work(id)
+        logger.debug('Runner._execute starting id=%r journey_spec=%r argument_datapool_id=%r minimum_duration=%r', id, journey_spec, argument_datapool_id, minimum_duration)
         while True:
             id_data['context_id'] = next(self._context_id_gen)
-            id_data.update(self._id_data)
             context = Context(self._msg_sender, id_data=id_data)
             add_context_extensions(context, None) #TODO register and retrieve extensions on journeysi
             try:
                 dpi = await self._checkout_data(argument_datapool_id)
-            except (TimeoutException, StopException):
+            except (TimeoutException, StopException) as e:
+                logger.debug("Runner._execute no args due to %r", type(e))
                 break
             try:
+                logger.debug("Runner._execute started jouney")
                 await journey(context, *dpi.data)
             except MiteError as me:
-                context.send_msg('error', {'message': str(e)})
+                msg = {'message': str(e)}
+                msg.update(me.fields)
+                context.send_msg('error', msg)
             except Exception as e:
                 context.log_error()
+                await asyncio.sleep(1)
+            logger.debug("Runner._execute complete jouney")
             await self._checkin_data(argument_datapool_id, dpi)
             if time.time() > start_time + minimum_duration:
                 break
+        self._dec_work(id)
 
     async def _checkout_data(self, datapool_id):
         if datapool_id not in self._datapool_proxies:
             self._datapool_proxies[datapool_id] = DataPoolProxy(self._transport, self._id, datapool_id)
         return await self._datapool_proxies[datapool_id].checkout()
 
-    async def _checkin_data(self, datapool_id, dpi)
+    async def _checkin_data(self, datapool_id, dpi):
         await self._datapool_proxies[datapool_id].checkin(dpi)
 

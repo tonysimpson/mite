@@ -5,7 +5,7 @@ import string
 
 from urllib.parse import urlencode
 
-from .exceptions import UnexpectedResponseCodeError
+from .exceptions import UnexpectedResponseCodeError, MiteError
 
 
 class ensure_seperation_from_callable:
