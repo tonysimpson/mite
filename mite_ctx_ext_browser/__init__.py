@@ -2,7 +2,13 @@ import asyncio
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from re import compile as re_compile, IGNORECASE, escape
-from ..mite.exceptions import OptionError
+from mite import MiteError
+
+
+class OptionError(MiteError):
+    def __init__(self, value):
+        super().__init__()
+        self.message = "Attempted to set a value not in options".format(value)
 
 
 def add_mixin(context):
