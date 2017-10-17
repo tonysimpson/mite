@@ -5,6 +5,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class WorkTracker:
     def __init__(self):
         self._all_work = defaultdict(lambda :defaultdict(int))
