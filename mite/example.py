@@ -12,7 +12,7 @@ async def journey(ctx, arg1, arg2):
 datapool = RecyclableIterableDataPool([(i, i+2) for i in range(5000)])
 
 
-volumemodel = lambda start, end: 50
+volumemodel = lambda start, end: 10
 
 
 def scenario():
