@@ -25,10 +25,6 @@ class Context:
         self._cleanup_extensions = []
 
     @property
-    def args(self):
-        return []
-
-    @property
     def _transaction_name(self):
         if self._transaction_names:
             return self._transaction_names[-1]
