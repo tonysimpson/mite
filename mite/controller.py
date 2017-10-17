@@ -44,16 +44,18 @@ class RunnerTracker:
 
 
 class Controller:
-    def __init__(self, testname, scenario_manager):
+    def __init__(self, testname, scenario_manager, config_manager):
         self._testname = testname
         self._scenario_manager = scenario_manager
         self._runner_id_gen = count(1)
         self._work_tracker = WorkTracker()
         self._runner_tracker = RunnerTracker()
+        self._config_manager = config_manager
         self._start_time = time.time()
     
     def initialise(self):
-        return next(self._runner_id_gen), self._testname
+        runner_id = next(self._runner_id_gen)
+        return runner_id, self._testname, self._config_manager.get_changes_for_runner(runner_id)
 
     def _set_actual(self, runner_id, current_work):
         self._work_tracker.set_actual(runner_id, current_work)
@@ -107,7 +109,7 @@ class Controller:
         self._add_assumed(runner_id, {id: wi.number for id, wi in work})
         result = [(id, wi.journey_spec, wi.argument_datapool_id, wi.number, wi.minimum_duration) for id, wi in work]
         logger.debug('Controller.work_request returning runner_id=%s result=%r', runner_id, result)
-        return result
+        return result, self._config_manager.get_changes_for_runner(runner_id)
 
     def checkin_and_checkout(self, runner_id, datapool_id, used_ids):
         self._scenario_manager.checkin_block(datapool_id, used_ids)

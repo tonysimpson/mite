@@ -20,12 +20,13 @@ class StopException(Exception):
 
 class RunnerControllerTransportExample:
     async def initialise(self):
-        """Returns runner id and the testname"""
+        """Returns runner id, the testname and a list of key, value config items"""
         pass
 
     async def request_work(self, runner_id, current_work):
         """Takes a dict of id -> number pairs and returns and iterable of 
-        (id, journey_spec, argument_datapool_id, number, minimum_duration)
+        (id, journey_spec, argument_datapool_id, number, minimum_duration) and
+        a list of key, value config items that have changed
         """
         pass
     
@@ -108,11 +109,40 @@ class DataPoolProxy:
         self._getting_more = False
 
 
+class RunnerConfig:
+    def __init__(self):
+        self._config = {}
+
+    def _update(self, kv_list):
+        for k, v in kv_list:
+            self._config[k] = v
+
+    def get(self, key, default=None):
+        try:
+            return self._config[key]
+        except KeyError:
+            if default is not None:
+                return default
+            else:
+                raise
+ 
+    def get_fallback(self, *keys, default=None):
+        for key in keys:
+            try:
+                return self._config[key]
+            except KeyError:
+                pass
+        if default is not None:
+            return default
+        raise KeyError("None of {} found".format(keys))
+
+
 class Runner:
     def __init__(self, transport, msg_sender):
         self._transport = transport
         self._msg_sender = msg_sender
         self._context_id_gen = count(1)
+        self._config = RunnerConfig()
         self._work = {}
         self._datapool_proxies = {}
 
@@ -121,11 +151,13 @@ class Runner:
         return self._work
 
     async def run(self):
-        self._id, self._test_name = await self._transport.initialise()
+        self._id, self._test_name, config_list = await self._transport.initialise()
+        self._config._update(config_list)
         self._base_id_data = {'test': self._test_name, 'runner_id': self._id}
         logger.debug("Entering run loop")
         while True:
-            work = await self._transport.request_work(self._id, self._current_work())
+            work, config_list = await self._transport.request_work(self._id, self._current_work())
+            self._config._update(config_list)
             logger.debug("requested_work=%s", work)
             for id, journey_spec, argument_datapool_id, number, minimum_duration in work:
                 for i in range(number):
@@ -152,7 +184,7 @@ class Runner:
         logger.debug('Runner._execute starting id=%r journey_spec=%r argument_datapool_id=%r minimum_duration=%r', id, journey_spec, argument_datapool_id, minimum_duration)
         while True:
             id_data['context_id'] = next(self._context_id_gen)
-            context = Context(self._msg_sender, id_data=id_data)
+            context = Context(self._msg_sender, self._config, id_data=id_data)
             add_context_extensions(context, None) #TODO register and retrieve extensions on journeysi
             try:
                 dpi = await self._checkout_data(argument_datapool_id)

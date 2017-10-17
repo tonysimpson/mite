@@ -2,10 +2,11 @@
 Mite Load Test Framwwork.
 
 Usage: 
-    mite scenario test [options] SCENARIO_SPEC
+    mite scenario test [options] SCENARIO_SPEC [--config=CONFIG_SPEC]
 
 Arguments:
     SCENARIO_SPEC           Identifier for a scenario in the form package_path:callable_name
+    CONFIG_SPEC             Identifier for config callable returning dict of config
 
 Examples:
     mite scenario test mite.example:scenario
@@ -20,6 +21,7 @@ import docopt
 
 from .datapools import DataPoolManager
 from .scenariomanager import ScenarioManager
+from .config import ConfigManager
 from .controller import Controller
 from .runner import Runner
 from .utils import spec_import
@@ -40,12 +42,18 @@ class DirectRunnerTransport:
 
 
 def scenario_test_cmd(opts):
+    print(opts)
     datapool_manager = DataPoolManager()
     scenario_manager = ScenarioManager(datapool_manager)
-    scenario = spec_import(opts['SCENARIO_SPEC'])
+    scenario = spec_import(opts['SCENARIO_SPEC'])()
     for journey_spec, datapool_spec, volumemodel_spec in scenario:
         scenario_manager.add_scenario(journey_spec, datapool_spec, volumemodel_spec)
-    controller = Controller('test', scenario_manager)
+    config_manager = ConfigManager()
+    if opts['--config'] is not None:
+        config = spec_import(opts['--config'])()
+        for k, v in config.items():
+            config_manager.set(k, v)
+    controller = Controller('test', scenario_manager, config_manager)
     transport = DirectRunnerTransport(controller)
     asyncio.ensure_future(Runner(transport, print).run())
     asyncio.get_event_loop().run_forever() 
