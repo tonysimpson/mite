@@ -3,6 +3,17 @@ import asyncio
 import random
 
 from .exceptions import MiteError
+from .context import Context, add_context_extensions
+from .runner import RunnerConfig
+
+
+def test_context(extensions=('http',), **config):
+    runner_config = RunnerConfig()
+    runner_config._update(config.items())
+    c = Context(print, runner_config)
+    add_context_extensions(c, extensions)
+    return c
+
 
 class ensure_seperation_from_callable:
     def __init__(self, sep_callable, loop=None):
