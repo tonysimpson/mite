@@ -113,6 +113,12 @@ class RunnerConfig:
     def __init__(self):
         self._config = {}
 
+    def __repr__(self):
+        return "RunnerConfig({})".format(", ".join(["{}={}".format(k, v) for k, v in self._config.items()]))
+
+    def __str__(self):
+        return self.__repr__()
+
     def _update(self, kv_list):
         for k, v in kv_list:
             self._config[k] = v
@@ -185,7 +191,7 @@ class Runner:
         while True:
             id_data['context_id'] = next(self._context_id_gen)
             context = Context(self._msg_sender, self._config, id_data=id_data)
-            add_context_extensions(context, None) #TODO register and retrieve extensions on journeysi
+            add_context_extensions(context, getattr(journey, "_mite_extensions", ["http"])) #TODO register and retrieve extensions on journeysi
             try:
                 dpi = await self._checkout_data(argument_datapool_id)
             except (TimeoutException, StopException) as e:

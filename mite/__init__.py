@@ -4,6 +4,7 @@ import random
 
 from .exceptions import MiteError
 
+
 class ensure_seperation_from_callable:
     def __init__(self, sep_callable, loop=None):
         self._sep_callable = sep_callable
@@ -45,4 +46,11 @@ def ensure_average_seperation(mean_seperation, plus_minus=None, loop=None):
         return mean_seperation + (random.random() * plus_minus * 2) - plus_minus
 
     return ensure_seperation_from_callable(average_seperation, loop=loop)
+
+
+def require_extension(*extensions):
+    def extended_journey(journey_func):
+        setattr(journey_func, "_mite_extensions", extensions)
+        return journey_func
+    return extended_journey
 

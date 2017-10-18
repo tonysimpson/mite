@@ -1,5 +1,5 @@
 """\
-Mite Load Test Framwwork.
+Mite Load Test Framewwork.
 
 Usage: 
     mite scenario test [options] SCENARIO_SPEC [--config=CONFIG_SPEC]
@@ -42,7 +42,6 @@ class DirectRunnerTransport:
 
 
 def scenario_test_cmd(opts):
-    print(opts)
     datapool_manager = DataPoolManager()
     scenario_manager = ScenarioManager(datapool_manager)
     scenario = spec_import(opts['SCENARIO_SPEC'])()

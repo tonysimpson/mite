@@ -25,4 +25,11 @@ class ConfigManager:
         self._version = next(self._version_id_gen)
         self._config[name] = (value, self._version)
 
+    def __repr__(self):
+        return "ConfigManager(version={}, {})".format(
+            self._version, " ,".join(["{}={}".format(k, v) for k, v in self._config.items()]))
+
+    def __str__(self):
+        self.__repr__()
+
 
