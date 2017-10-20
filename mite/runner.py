@@ -10,6 +10,7 @@ from . import MiteError
 
 logger = logging.getLogger(__name__)
 
+
 class TimeoutException(Exception):
     pass
 
@@ -201,7 +202,7 @@ class Runner:
                 logger.debug("Runner._execute started jouney")
                 await journey(context, *dpi.data)
             except MiteError as me:
-                msg = {'message': str(e)}
+                msg = {'message': str(me)}
                 msg.update(me.fields)
                 context.send_msg('error', msg)
             except Exception as e:

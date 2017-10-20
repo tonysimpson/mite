@@ -12,7 +12,7 @@ class OptionError(MiteError):
 
 
 def add_mixin(context):
-    context.browser = Browser(context.http)
+    return Browser(context.http)
 
 
 def get_ext():
@@ -43,6 +43,12 @@ class Browser:
         if embedded_res:
             await self._download_resources(page)
         return page
+
+    async def get(self, url, embedded_res=False, *args, **kwargs):
+        return await self.request("GET", url, embedded_res=embedded_res, *args, **kwargs )
+
+    async def post(self, url, embedded_res=False, *args, **kwargs):
+        return await self.request("POST", url, embedded_res=embedded_res, *args, **kwargs )
 
 
 class Resource:
@@ -76,6 +82,7 @@ class Page(Resource, ContainerMixin):
         self.stylesheets = []
         self.resources = []
         self.frames = []
+        self.status_code = response.status_code
 
     @property
     def resources_with_embedabbles(self):
@@ -128,8 +135,8 @@ class Page(Resource, ContainerMixin):
         return Form(self._get_element(self.dom, 'form', attrs, text, **kwargs), self)
 
     async def click_link(self, attrs=None, text=None, **kwargs):
-        return await self.browser.request('GET', self._get_element(
-            self.dom, 'a', attrs=attrs, text=text, **kwargs).attrs['href'])
+        return await self.browser.get(
+            self._get_element(self.dom, 'a', attrs=attrs, text=text, **kwargs).attrs['href'])
 
 
 class Script(Resource):
@@ -168,8 +175,8 @@ class Form(ContainerMixin):
                 self.fields[f.name] = f
 
     def _serialize(self):
-        return {'data': {name: f.value for name, f in self.fields.items() if not f.disabled},
-                'files': [(name, v) for name, f in self.files.items() for v in f.value if not f.disabled]}
+        return {'data': {name: f.value for name, f in self.fields.items() if not f._disabled},
+                'files': [(name, v) for name, f in self.files.items() for v in f.value if not f._disabled]}
 
     def _extract_fields_as_subtype(self):
         fields = self.element.find_all(['select', 'textarea', 'input'])
