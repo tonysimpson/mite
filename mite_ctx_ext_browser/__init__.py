@@ -11,6 +11,24 @@ class OptionError(MiteError):
         self.message = "Attempted to set a value not in options".format(value)
 
 
+def url_builder(base_url, *args, **kwargs):
+    new_args = []
+    if args:
+        url = base_url[:-1] if base_url.endswith('/') else base_url
+        for arg in args:
+            if arg.endswith('/') and arg != args[-1]:
+                arg = arg[:-1]
+            if not arg.startswith('/'):
+                arg = ''.join(['/', arg])
+            new_args.append(arg)
+        url = ''.join([url, ''.join(new_args)])
+    else:
+        url = base_url
+    if kwargs:
+        url = ''.join([url, '?', urlencode(kwargs)])
+    return url
+
+
 def add_mixin(context):
     return Browser(context.http)
 
@@ -175,13 +193,17 @@ class Form(ContainerMixin):
                 self.fields[f.name] = f
 
     def _serialize(self):
-        return {'data': {name: f.value for name, f in self.fields.items() if not f._disabled},
-                'files': [(name, v) for name, f in self.files.items() for v in f.value if not f._disabled]}
+        """Serializing should get files and data ready for submission. However acurl backend not currently
+        supporting files so just data will be submitted.
+
+        TODO: Add file support back in when we have acurl sorted"""
+        #return {'data': {name: f.value for name, f in self.fields.items() if not f.disabled},
+        #       'files': [(name, v) for name, f in self.files.items() for v in f.value if not f.disabled]}
+        return {'json': {name: f.value for name, f in self.fields.items() if not f.disabled}}
 
     def _extract_fields_as_subtype(self):
         fields = self.element.find_all(['select', 'textarea', 'input'])
-        while fields:
-            field = fields.pop()
+        for field in fields:
             if field.name == 'select':
                 yield SelectField(field)
             elif field.name == 'textarea':
@@ -216,8 +238,9 @@ class Form(ContainerMixin):
         else:
             raise KeyError("{} not in form fields".format(item))
 
-    async def submit(self, embedded_res=False):
-        return await self._page.browser.request(self.method, self.action, embedded_res=embedded_res, **self._serialize())
+    async def submit(self, base_url='', embedded_res=False):
+        return await self._page.browser.request(
+            self.method, url_builder(base_url, self.action), embedded_res=embedded_res, **self._serialize())
 
 
 class BaseFormField:

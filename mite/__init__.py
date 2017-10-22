@@ -15,7 +15,6 @@ def test_context(extensions=('http',), **config):
     return c
 
 
-
 class ensure_seperation_from_callable:
     def __init__(self, sep_callable, loop=None):
         self._sep_callable = sep_callable
