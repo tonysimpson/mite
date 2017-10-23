@@ -6,8 +6,8 @@ setup(
     name = 'mite',
     packages=[
         'mite',
-        'mite_ctx_ext_http',
-        'mite_ctx_ext_browser'
+        'mite_http',
+        'mite_browser'
     ],
     version='0.0.1a',
     install_requires=[
