@@ -3,7 +3,7 @@ import asyncio
 import random
 
 from .exceptions import MiteError
-from .context import Context, add_context_extensions
+from .context import Context
 from .runner import RunnerConfig
 
 
@@ -11,7 +11,6 @@ def test_context(extensions=('http',), **config):
     runner_config = RunnerConfig()
     runner_config._update(config.items())
     c = Context(print, runner_config)
-    add_context_extensions(c, extensions)
     return c
 
 
@@ -57,10 +56,4 @@ def ensure_average_seperation(mean_seperation, plus_minus=None, loop=None):
 
     return ensure_seperation_from_callable(average_seperation, loop=loop)
 
-
-def require_extension(*extensions):
-    def extended_journey(journey_func):
-        setattr(journey_func, "_mite_extensions", extensions)
-        return journey_func
-    return extended_journey
 

@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from re import compile as re_compile, IGNORECASE, escape
 from mite import MiteError
-
+import mite_http
 
 class OptionError(MiteError):
     def __init__(self, value):
@@ -29,12 +29,13 @@ def url_builder(base_url, *args, **kwargs):
     return url
 
 
-def add_mixin(context):
-    return Browser(context.http)
-
-
-def get_ext():
-    return add_mixin, None, ['http']
+def browser_decorator(func):
+    async def wrapper(context, *args, **kwargs):
+        async with mite.get_session_pool().session_context(context):
+            context.browser = Browser(context.http)
+            result = await func(context, *args, **kwargs)
+            del context.browser
+            return result
 
 
 class Browser:

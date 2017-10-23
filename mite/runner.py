@@ -4,7 +4,7 @@ from collections import deque
 import time
 import logging
 
-from .context import Context, add_context_extensions
+from .context import Context
 from .utils import spec_import
 from . import MiteError
 
@@ -192,7 +192,6 @@ class Runner:
         while True:
             id_data['context_id'] = next(self._context_id_gen)
             context = Context(self._msg_sender, self._config, id_data=id_data)
-            add_context_extensions(context, getattr(journey, "_mite_extensions", ["http"])) #TODO register and retrieve extensions on journeysi
             try:
                 dpi = await self._checkout_data(argument_datapool_id)
             except (TimeoutException, StopException) as e:
