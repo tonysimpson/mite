@@ -1,14 +1,18 @@
 import asyncio
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin
+from urllib.parse import urlencode
 from re import compile as re_compile, IGNORECASE, escape
 from mite import MiteError
 import mite_http
 
 class OptionError(MiteError):
     def __init__(self, value):
-        super().__init__()
-        self.message = "Attempted to set a value not in options".format(value)
+        super().__init__("Attempted to set a value not in options", value=value)
+
+
+class ElementNotFoundException(MiteError):
+    def __init__(self, **kwargs):
+        super().__init__("Could not find element in page with search terms", **kwargs)
 
 
 def url_builder(base_url, *args, **kwargs):
@@ -103,6 +107,22 @@ class Page(Resource, ContainerMixin):
         self.frames = []
         self.status_code = response.status_code
 
+    def assert_element_in_dom(self, name=None, attrs={}, recursive=True, text=None, **kwargs):
+        if self.find(name=name, attrs=attrs, recursive=recursive, text=text, **kwargs):
+            return True
+        else:
+            raise ElementNotFoundException()
+
+    def find(self, name=None, attrs={}, recursive=True, text=None,
+             **kwargs):
+        return self.dom.find(name=name, attrs=attrs, recursive=recursive, text=text,
+                             **kwargs)
+
+    def find_all(self, name=None, attrs={}, recursive=True, text=None,
+                 limit=None, **kwargs):
+        return self.dom.find_all(name=name, attrs=attrs, recursive=recursive, text=text,
+                                 limit=limit, **kwargs)
+
     @property
     def resources_with_embedabbles(self):
         """Any sub-resources of a page which might also contain their own embedded resources"""
@@ -125,25 +145,25 @@ class Page(Resource, ContainerMixin):
         for burl in self.dom.find_all('base', {'href': True}):
             base_url = burl.attrs['href'] # reset the base url to the one in the page
         for elem in self.dom.find_all(True, attrs={'background': True}):
-            yield urljoin(base_url, elem.attrs['background']), 'resource'
+            yield url_builder(base_url, elem.attrs['background']), 'resource'
         for elem in self.dom.find_all(['img', 'embed', 'bgsound'], attrs={'src': True}):
-            yield urljoin(base_url, elem.attrs['src']), 'resource'
+            yield url_builder(base_url, elem.attrs['src']), 'resource'
         for elem in self.dom.find_all(['script'], attrs={'src': True}):
-            yield urljoin(base_url, elem.attrs['src']), 'script'
+            yield url_builder(base_url, elem.attrs['src']), 'script'
         for elem in self.dom.find_all(['frame', 'iframe'], attrs={'src': True}):
-            yield urljoin(base_url, elem.attrs['src']), 'page'
+            yield url_builder(base_url, elem.attrs['src']), 'page'
         for elem in self.dom.find_all('link', attrs={'rel': 'stylesheet', 'href': True}):
-            yield urljoin(base_url, elem.attrs['href']), 'stylesheet'
+            yield url_builder(base_url, elem.attrs['href']), 'stylesheet'
         for elem in self.dom.find_all('input', attrs={'type': 'image', 'href': True}):
-            yield urljoin(base_url, elem.attrs['href']), 'resource'
+            yield url_builder(base_url, elem.attrs['href']), 'resource'
         for elem in self.dom.find_all('applet', attrs={'code': True}):
-            yield urljoin(base_url, elem.attrs['code']), 'resource'
+            yield url_builder(base_url, elem.attrs['code']), 'resource'
         for elem in self.dom.find_all('object', attrs={'codebase': True}):
-            yield urljoin(base_url, elem.attrs['codebase']), 'resource'
+            yield url_builder(base_url, elem.attrs['codebase']), 'resource'
         for elem in self.dom.find_all('object', attrs={'data': True}):
-            yield urljoin(base_url, elem.attrs['data']), 'resource'
+            yield url_builder(base_url, elem.attrs['data']), 'resource'
         for elem in self.dom.find_all(True, attrs={'style': True}):
-            yield urljoin(
+            yield url_builder(
                 base_url, re_compile("url\(\s*[\"'](.*)[\"']\s*\)", IGNORECASE).match(elem.attrs['style'])), 'resource'
 
     async def on_dom_ready(self):
@@ -156,6 +176,12 @@ class Page(Resource, ContainerMixin):
     async def click_link(self, attrs=None, text=None, **kwargs):
         return await self.browser.get(
             self._get_element(self.dom, 'a', attrs=attrs, text=text, **kwargs).attrs['href'])
+
+    def __repr__(self):
+        return str(self.dom)
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class Script(Resource):
@@ -173,7 +199,7 @@ class Stylesheet(Resource):
         """Extracts embedded resources from a stylesheet"""
         base_url = self.response.url
         for match in re_compile("url\(\s*[\"'](.*)[\"']\s*\)", IGNORECASE).finditer(self.response.text):
-            yield urljoin(base_url, match)
+            yield url_builder(base_url, match)
 
 
 class Form(ContainerMixin):
@@ -203,7 +229,8 @@ class Form(ContainerMixin):
         return {'json': {name: f.value for name, f in self.fields.items() if not f.disabled}}
 
     def _extract_fields_as_subtype(self):
-        fields = self.element.find_all(['select', 'textarea', 'input'])
+        FIELD_TYPES = ['select', 'textarea', 'input']
+        fields = self.element.find_all(FIELD_TYPES)
         for field in fields:
             if field.name == 'select':
                 yield SelectField(field)
@@ -236,8 +263,6 @@ class Form(ContainerMixin):
             self.fields[item].value = value
         elif item in self.files:
             self.files[item].value = value
-        else:
-            raise KeyError("{} not in form fields".format(item))
 
     async def submit(self, base_url='', embedded_res=False):
         return await self._page.browser.request(
