@@ -10,6 +10,7 @@ from . import MiteError
 
 logger = logging.getLogger(__name__)
 
+
 class TimeoutException(Exception):
     pass
 

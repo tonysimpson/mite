@@ -3,6 +3,7 @@ import time
 import traceback
 from unittest.mock import MagicMock
 
+
 class _TransactionContextManager:
     def __init__(self, user_session, name):
         self._user_session = user_session
@@ -77,7 +78,7 @@ class Context:
 
     def send(self, type, **content):
         msg = content
-        msg['type'] = type;
+        msg['type'] = type
         self._add_context_headers_and_time(msg)
         self._send(msg)
 
