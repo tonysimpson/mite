@@ -104,7 +104,6 @@ class Page(Resource, ContainerMixin):
         self.stylesheets = []
         self.resources = []
         self.frames = []
-        self.status_code = response.status_code
 
     def assert_element_in_dom(self, name=None, attrs={}, recursive=True, text=None, **kwargs):
         if self.find(name=name, attrs=attrs, recursive=recursive, text=text, **kwargs):
@@ -121,6 +120,10 @@ class Page(Resource, ContainerMixin):
                  limit=None, **kwargs):
         return self.dom.find_all(name=name, attrs=attrs, recursive=recursive, text=text,
                                  limit=limit, **kwargs)
+
+    @property
+    def status_code(self):
+        return self.repsonse.status_code
 
     @property
     def resources_with_embedabbles(self):
@@ -264,7 +267,7 @@ class Form(ContainerMixin):
             self.files[item].value = value
 
     async def submit(self, base_url='', embedded_res=False):
-        return await self._page.browser.request(
+        await self._page.browser.request(
             self.method, url_builder(base_url, self.action), embedded_res=embedded_res, **self._serialize())
 
 
