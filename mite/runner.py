@@ -202,9 +202,7 @@ class Runner:
                 logger.debug("Runner._execute started jouney")
                 await journey(context, *dpi.data)
             except MiteError as me:
-                msg = {'message': str(me)}
-                msg.update(me.fields)
-                context.send_msg('error', msg)
+                context.send('error', message=str(me), **me.fields)
             except Exception as e:
                 context.log_error()
                 await asyncio.sleep(1)
