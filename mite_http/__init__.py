@@ -1,6 +1,7 @@
 from collections import deque
 from acurl import EventLoop
 
+
 class _SessionPoolContextManager:
     def __init__(self, session_pool, context):
         self._session_pool = session_pool

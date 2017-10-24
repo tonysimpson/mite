@@ -5,6 +5,7 @@ from re import compile as re_compile, IGNORECASE, escape
 from mite import MiteError
 import mite_http
 
+
 class OptionError(MiteError):
     def __init__(self, value):
         super().__init__("Attempted to set a value not in options", value=value)
@@ -35,11 +36,12 @@ def url_builder(base_url, *args, **kwargs):
 
 def browser_decorator(func):
     async def wrapper(context, *args, **kwargs):
-        async with mite.get_session_pool().session_context(context):
+        async with mite_http.get_session_pool().session_context(context):
             context.browser = Browser(context.http)
             result = await func(context, *args, **kwargs)
             del context.browser
             return result
+    return wrapper
 
 
 class Browser:
@@ -68,10 +70,16 @@ class Browser:
         return page
 
     async def get(self, url, embedded_res=False, *args, **kwargs):
-        return await self.request("GET", url, embedded_res=embedded_res, *args, **kwargs )
+        return await self.request("GET", url, embedded_res=embedded_res, *args, **kwargs)
 
     async def post(self, url, embedded_res=False, *args, **kwargs):
-        return await self.request("POST", url, embedded_res=embedded_res, *args, **kwargs )
+        return await self.request("POST", url, embedded_res=embedded_res, *args, **kwargs)
+
+    async def erase_all_cookies(self):
+        await self._session.erase_all_cookies()
+
+    async def erase_session_cookies(self):
+        await self._session.erase_session_cookies()
 
 
 class Resource:
@@ -110,7 +118,7 @@ class Page(Resource, ContainerMixin):
         if self.find(name=name, attrs=attrs, recursive=recursive, text=text, **kwargs):
             return True
         else:
-            raise ElementNotFoundException()
+            raise ElementNotFoundException(name=name, attrs=attrs, text=text, **kwargs)
 
     def find(self, name=None, attrs={}, recursive=True, text=None,
              **kwargs):
@@ -123,8 +131,12 @@ class Page(Resource, ContainerMixin):
                                  limit=limit, **kwargs)
 
     @property
+    def text(self):
+        return self.response.text
+
+    @property
     def status_code(self):
-        return self.repsonse.status_code
+        return self.response.status_code
 
     @property
     def resources_with_embedabbles(self):
@@ -268,7 +280,7 @@ class Form(ContainerMixin):
             self.files[item].value = value
 
     async def submit(self, base_url='', embedded_res=False):
-        await self._page.browser.request(
+        return await self._page.browser.request(
             self.method, url_builder(base_url, self.action), embedded_res=embedded_res, **self._serialize())
 
 
@@ -309,12 +321,13 @@ class SelectField(BaseFormField):
         else:
             return [o.value for o in self.options]
 
-    @BaseFormField.value.setter
-    def value(self, value):
-        if value in self.options:
-            self._value = value
-        else:
-            raise OptionError(value)
+    # I want to use this but the existing LR tests are posting values not in the dropdown
+    #@BaseFormField.value.setter
+    #def value(self, value):
+    #    if value in self.options:
+    #        self._value = value
+    #    else:
+    #        raise OptionError(value)
 
 
 class CheckboxField(BaseFormField):
