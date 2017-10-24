@@ -241,7 +241,7 @@ class Form(ContainerMixin):
         TODO: Add file support back in when we have acurl sorted"""
         #return {'data': {name: f.value for name, f in self.fields.items() if not f.disabled},
         #       'files': [(name, v) for name, f in self.files.items() for v in f.value if not f.disabled]}
-        return {'json': {name: f.value for name, f in self.fields.items() if not f.disabled}}
+        return {'data': urlencode({name: f for name, f in self.fields.items() if not f.disabled})}
 
     def _extract_fields_as_subtype(self):
         FIELD_TYPES = ['select', 'textarea', 'input']
