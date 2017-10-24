@@ -60,19 +60,20 @@ class Browser:
             for url, rtype in page._extract_embeded_urls()])
         await asyncio.gather(*[self._download_resources(subpage) for subpage in page.resources_with_embedabbles])
 
-    async def request(self, method, url, embedded_res=False, *args, **kwargs):
+    async def request(self, method, url, *args, **kwargs):
         """Perform a request and return a page object"""
         # Wrap everything in page object
+        embedded_res = kwargs.pop("embedded_res", False)
         resp = await self._session.request(method, url, *args, **kwargs)
         page = Page(resp, self)
         if embedded_res:
             await self._download_resources(page)
         return page
 
-    async def get(self, url, embedded_res=False, *args, **kwargs):
-        return await self.request("GET", url, embedded_res=embedded_res, *args, **kwargs)
+    async def get(self, url, *args, **kwargs):
+        return await self.request("GET", url, *args, **kwargs)
 
-    async def post(self, url, embedded_res=False, *args, **kwargs):
+    async def post(self, url, *args, **kwargs):
         return await self.request("POST", url, embedded_res=embedded_res, *args, **kwargs)
 
     async def erase_all_cookies(self):
@@ -80,6 +81,9 @@ class Browser:
 
     async def erase_session_cookies(self):
         await self._session.erase_session_cookies()
+
+    async def get_cookie_list(self):
+        return await self._session.get_cookie_list()
 
 
 class Resource:
@@ -133,6 +137,10 @@ class Page(Resource, ContainerMixin):
     @property
     def text(self):
         return self.response.text
+
+    @property
+    def headers(self):
+        return self.response.headers
 
     @property
     def status_code(self):
@@ -239,9 +247,7 @@ class Form(ContainerMixin):
         supporting files so just data will be submitted.
 
         TODO: Add file support back in when we have acurl sorted"""
-        #return {'data': {name: f.value for name, f in self.fields.items() if not f.disabled},
-        #       'files': [(name, v) for name, f in self.files.items() for v in f.value if not f.disabled]}
-        return {'data': urlencode({name: f for name, f in self.fields.items() if not f.disabled})}
+        return {'data': urlencode({name: f.value for name, f in self.fields.items() if not f.disabled})}
 
     def _extract_fields_as_subtype(self):
         FIELD_TYPES = ['select', 'textarea', 'input']
