@@ -104,15 +104,24 @@ class ContainerMixin:
     """Mixin for things which need to find elements within themselves"""
 
     @staticmethod
-    def _get_element(root_elem, name=None, attrs=None, text=None, **kwargs):
+    def _get_element(root_elem, name=None, attrs=None, text=None, recursive=True, **kwargs):
         # Bs4 text doesn't work with other finders according to robobrowser so split off.
-        matches = root_elem.find_all(name, attrs, True, None, **kwargs)
+        matches = root_elem.find_all(name, attrs, recursive, None, **kwargs)
         if not text:
             return matches[0]
         text = re_compile(escape(text), IGNORECASE)
         for match in matches:
             if text.search(match.text):
                 return match
+
+    @staticmethod
+    def _get_elements(root_elem, name=None, attrs=None, text=None, recursive=True, **kwargs):
+        # Bs4 text doesn't work with other finders according to robobrowser so split off.
+        matches = root_elem.find_all(name, attrs, recursive, None, **kwargs)
+        if not text:
+            return matches
+        text = re_compile(escape(text), IGNORECASE)
+        return [match for match in matches if text.search(match.text)]
 
 
 class Page(Resource, ContainerMixin):
@@ -133,13 +142,13 @@ class Page(Resource, ContainerMixin):
 
     def find(self, name=None, attrs={}, recursive=True, text=None,
              **kwargs):
-        return self.dom.find(name=name, attrs=attrs, recursive=recursive, text=text,
-                             **kwargs)
+        return self._get_element(self.dom, name=name, attrs=attrs, recursive=recursive, text=text,
+                                 **kwargs)
 
     def find_all(self, name=None, attrs={}, recursive=True, text=None,
                  limit=None, **kwargs):
-        return self.dom.find_all(name=name, attrs=attrs, recursive=recursive, text=text,
-                                 limit=limit, **kwargs)
+        return self._get_elements(self.dom, name=name, attrs=attrs, recursive=recursive, text=text,
+                                  limit=limit, **kwargs)
 
     @property
     def cookies(self):
