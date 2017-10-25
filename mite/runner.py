@@ -192,21 +192,27 @@ class Runner:
         while True:
             id_data['context_id'] = next(self._context_id_gen)
             context = Context(self._msg_sender, self._config, id_data=id_data)
-            try:
-                dpi = await self._checkout_data(argument_datapool_id)
-            except (TimeoutException, StopException) as e:
-                logger.debug("Runner._execute no args due to %r", type(e))
-                break
+            if argument_datapool_id > 0:
+                try:
+                    dpi = await self._checkout_data(argument_datapool_id)
+                except (TimeoutException, StopException) as e:
+                    logger.debug("Runner._execute no args due to %r", type(e))
+                    break
+                else:
+                    args = dpi.data
+            else:
+                args = []
             try:
                 logger.debug("Runner._execute started jouney")
-                await journey(context, *dpi.data)
+                await journey(context, *args)
             except MiteError as me:
                 context.send('error', message=str(me), **me.fields)
             except Exception as e:
                 context.log_error()
                 await asyncio.sleep(1)
             logger.debug("Runner._execute complete jouney")
-            await self._checkin_data(argument_datapool_id, dpi)
+            if argument_datapool_id > 0:
+                await self._checkin_data(argument_datapool_id, dpi)
             if time.time() > start_time + minimum_duration:
                 break
         self._dec_work(id)
