@@ -34,24 +34,25 @@ class SessionPool:
             session = self._pool.pop()
         else:
             session = self._el.session()
-            session._real_request = session._request
+            session._real_request = session.request
         async def _wrapped_request(*args, **kwargs):
-            r = await session._real_request(*args, **kwargs)
-            context.send('http_curl_metrics', 
-                time=r.start_time, 
-                effective_url=r.url, 
-                response_code=r.status_code,
-                dns_time=r.namelookup_time,
-                connect_time=r.connect_time,
-                tls_time=r.appconnect_time,
-                transfer_start_time=r.pretransfer_time,
-                first_byte_time=r.starttransfer_time,
-                total_time=r.total_time,
-                primary_ip=r.primary_ip,
-                method=r.request.method
-            )
-            return r
-        session._request = _wrapped_request
+            resp = await session._real_request(*args, **kwargs)
+            for r in resp.history + [resp]:
+                context.send('http_curl_metrics', 
+                    time=r.start_time, 
+                    effective_url=r.url, 
+                    response_code=r.status_code,
+                    dns_time=r.namelookup_time,
+                    connect_time=r.connect_time,
+                    tls_time=r.appconnect_time,
+                    transfer_start_time=r.pretransfer_time,
+                    first_byte_time=r.starttransfer_time,
+                    total_time=r.total_time,
+                    primary_ip=r.primary_ip,
+                    method=r.request.method
+                )
+            return resp
+        session.request = _wrapped_request
         return session
 
     async def _checkin(self, session):

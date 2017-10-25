@@ -38,7 +38,7 @@ class ScenarioManager:
     def _update_required_and_period(self, start_of_period, end_of_period):
         required = {}
         for scenario in self._scenarios:
-            number = scenario.volumemodel(start_of_period, end_of_period)
+            number = int(scenario.volumemodel(start_of_period, end_of_period))
             required[scenario.id] = WorkItem(scenario.journey_spec, scenario.argument_datapool_id, number, self._period)
         self._current_period_end = end_of_period
         self._required = required

@@ -16,6 +16,8 @@ class DataPoolManager:
         self._id_to_datapool = {}
 
     def register(self, datapool_spec):
+        if datapool_spec is None:
+            return 0
         if datapool_spec not in self._spec_to_id:
             datapool_id = next(self._datapool_id_gen)
             self._spec_to_id[datapool_spec] = datapool_id
@@ -23,12 +25,14 @@ class DataPoolManager:
         return self._spec_to_id[datapool_spec]
 
     def checkin_block(self, datapool_id, ids):
+        assert datapool_id > 0
         logger.debug('DataPoolManager.checkin_block datapool_id=%r ids=%r', datapool_id, ids)
         dp = self._id_to_datapool[datapool_id]
         for id in ids:
             dp.checkin(id)
 
     def checkout_block(self, datapool_id):
+        assert datapool_id > 0
         result = []
         dp = self._id_to_datapool[datapool_id]
         block_size = random.randint(self._max_block_size // 10, self._max_block_size)
