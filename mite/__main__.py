@@ -19,6 +19,7 @@ Options:
 """
 import asyncio
 import docopt
+import threading
 
 from .datapools import DataPoolManager
 from .scenariomanager import ScenarioManager
@@ -26,6 +27,7 @@ from .config import ConfigManager
 from .controller import Controller
 from .runner import Runner
 from .utils import spec_import, pack_msg
+from .web import app, metrics_processor
 import logging
 
 
@@ -44,13 +46,22 @@ class DirectRunnerTransport:
 
 
 def _msg_handler(msg):
+    metrics_processor.process_message(msg)
     if 'type' in msg and msg['type'] == 'data_created':
         open(msg['name'] + '.msgpack', 'wb+').write(pack_msg(msg['data']))
     for k, v in sorted(msg.items()):
         print("{}={}".format(k, v))
     print()
 
+
+def _start_web_in_thread():
+    t = threading.Thread(target=app.run, name='mite.web', kwargs={'host': '0.0.0.0', 'port': 9301})
+    t.daemon = True
+    t.start()
+
+
 def scenario_test_cmd(opts):
+    _start_web_in_thread()
     datapool_manager = DataPoolManager()
     scenario_manager = ScenarioManager(datapool_manager)
     scenario = spec_import(opts['SCENARIO_SPEC'])()
