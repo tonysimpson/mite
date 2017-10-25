@@ -22,9 +22,6 @@ class ensure_seperation_from_callable:
     async def __aenter__(self):
         self._start = time.time()
 
-    def __enter__(self):
-        self._start = time.time()
-
     def _sleep_time(self):
         return self._sep_callable() - (time.time() - self._start)
         
@@ -35,11 +32,6 @@ class ensure_seperation_from_callable:
         if sleep_time > 0:
             await asyncio.sleep(sleep_time, loop=self._loop)
         
-    def __exit__(self, *args):
-        sleep_time = self._sleep_time()
-        if self._sleep_time() > 0:
-            time.sleep(sleep_time)
-
 
 def ensure_fixed_seperation(seperation, loop=None):
     def fixed_seperation():
