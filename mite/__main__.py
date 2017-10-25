@@ -25,7 +25,7 @@ from .scenariomanager import ScenarioManager
 from .config import ConfigManager
 from .controller import Controller
 from .runner import Runner
-from .utils import spec_import
+from .utils import spec_import, pack_msg
 import logging
 
 
@@ -43,11 +43,12 @@ class DirectRunnerTransport:
         return self._controller.checkin_and_checkout(runner_id, datapool_id, [dpi.id for dpi in used_list])
 
 
-def _msg_printer(msg):
+def _msg_handler(msg):
+    if 'type' in msg and msg['type'] == 'data_created':
+        open(msg['name'] + '.msgpack', 'wb+').write(pack_msg(msg['data']))
     for k, v in sorted(msg.items()):
         print("{}={}".format(k, v))
     print()
-
 
 def scenario_test_cmd(opts):
     datapool_manager = DataPoolManager()
@@ -62,7 +63,7 @@ def scenario_test_cmd(opts):
             config_manager.set(k, v)
     controller = Controller('test', scenario_manager, config_manager)
     transport = DirectRunnerTransport(controller)
-    asyncio.ensure_future(Runner(transport, _msg_printer).run())
+    asyncio.ensure_future(Runner(transport, _msg_handler).run())
     asyncio.get_event_loop().run_forever() 
 
 
