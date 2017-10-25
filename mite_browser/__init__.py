@@ -2,7 +2,7 @@ import asyncio
 from bs4 import BeautifulSoup
 from urllib.parse import urlencode
 from re import compile as re_compile, IGNORECASE, escape
-from mite import MiteError
+from mite import MiteError, ensure_fixed_seperation
 import mite_http
 
 
@@ -11,7 +11,7 @@ class OptionError(MiteError):
         super().__init__("Attempted to set a value not in options", value=value)
 
 
-class ElementNotFoundException(MiteError):
+class ElementNotFoundError(MiteError):
     def __init__(self, **kwargs):
         super().__init__("Could not find element in page with search terms", **kwargs)
 
@@ -34,14 +34,17 @@ def url_builder(base_url, *args, **kwargs):
     return url
 
 
-def browser_decorator(func):
-    async def wrapper(context, *args, **kwargs):
-        async with mite_http.get_session_pool().session_context(context):
-            context.browser = Browser(context.http)
-            result = await func(context, *args, **kwargs)
-            del context.browser
-            return result
-    return wrapper
+def browser_decorator(separation=0):
+    def wrapper_factory(func):
+        async def wrapper(context, *args, **kwargs):
+            async with mite_http.get_session_pool().session_context(context):
+                context.browser = Browser(context.http)
+                async with ensure_fixed_seperation(separation):
+                    result = await func(context, *args, **kwargs)
+                del context.browser
+                return result
+        return wrapper
+    return wrapper_factory
 
 
 class Browser:
@@ -70,11 +73,15 @@ class Browser:
             await self._download_resources(page)
         return page
 
+    @property
+    def headers(self):
+        return self._session.headers
+
     async def get(self, url, *args, **kwargs):
         return await self.request("GET", url, *args, **kwargs)
 
     async def post(self, url, *args, **kwargs):
-        return await self.request("POST", url, embedded_res=embedded_res, *args, **kwargs)
+        return await self.request("POST", url, *args, **kwargs)
 
     async def erase_all_cookies(self):
         await self._session.erase_all_cookies()
@@ -122,7 +129,7 @@ class Page(Resource, ContainerMixin):
         if self.find(name=name, attrs=attrs, recursive=recursive, text=text, **kwargs):
             return True
         else:
-            raise ElementNotFoundException(name=name, attrs=attrs, text=text, **kwargs)
+            raise ElementNotFoundError(name=name, attrs=attrs, text=text, **kwargs)
 
     def find(self, name=None, attrs={}, recursive=True, text=None,
              **kwargs):
@@ -133,6 +140,10 @@ class Page(Resource, ContainerMixin):
                  limit=None, **kwargs):
         return self.dom.find_all(name=name, attrs=attrs, recursive=recursive, text=text,
                                  limit=limit, **kwargs)
+
+    @property
+    def cookies(self):
+        return self.response.cookies
 
     @property
     def text(self):
@@ -229,7 +240,7 @@ class Form(ContainerMixin):
     def __init__(self, element, page):
         self._page = page
         self.element = element
-        self.method = element.get('method')
+        self.method = element.get('method').upper()
         self.action = element.get('action')
         self.fields = {}
         self.files = {}
