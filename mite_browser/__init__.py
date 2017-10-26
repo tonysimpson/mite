@@ -303,6 +303,9 @@ class Form(ContainerMixin):
         else:
             raise KeyError("{} not in form fields".format(item))
 
+    def __delitem__(self, item):
+        del self.fields[item]
+
     def __setitem__(self, item, value):
         if item in self.fields:
             self.fields[item].value = value
@@ -380,6 +383,11 @@ class RadioField:
         self.elements = elements
         self.name = elements[0].attrs.get('name')
         self._value = elements[0].attrs.get('value')
+        self._disabled = bool(elements[0].get('disabled'))
+
+    @property
+    def disabled(self):
+        return self._disabled
 
     @property
     def value(self):
