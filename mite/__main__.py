@@ -12,9 +12,10 @@ Examples:
     mite scenario test mite.example:scenario
 
 Options:
-    -h --help           Show this screen.
-    --version           Show version
-    --log-level=LEVEL   Set logger level, one of DEBUG, INFO, WARNING, ERROR, CRITICAL [default: WARNING]
+    -h --help               Show this screen.
+    --version               Show version
+    --log-level=LEVEL       Set logger level, one of DEBUG, INFO, WARNING, ERROR, CRITICAL [default: WARNING]
+    --config=CONFIG_SPEC    Set a config loader to a callable loaded via a spec [default: mite.config:default_config_loader]
 
 """
 import asyncio
