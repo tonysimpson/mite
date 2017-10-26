@@ -107,6 +107,8 @@ class ContainerMixin:
     def _get_element(root_elem, name=None, attrs=None, text=None, recursive=True, **kwargs):
         # Bs4 text doesn't work with other finders according to robobrowser so split off.
         matches = root_elem.find_all(name, attrs, recursive, None, **kwargs)
+        if not matches:
+            return None
         if not text:
             return matches[0]
         text = re_compile(escape(text), IGNORECASE)
@@ -118,10 +120,22 @@ class ContainerMixin:
     def _get_elements(root_elem, name=None, attrs=None, text=None, recursive=True, **kwargs):
         # Bs4 text doesn't work with other finders according to robobrowser so split off.
         matches = root_elem.find_all(name, attrs, recursive, None, **kwargs)
+        if not matches:
+            return []
         if not text:
             return matches
         text = re_compile(escape(text), IGNORECASE)
         return [match for match in matches if text.search(match.text)]
+
+    def find(self, name=None, attrs={}, recursive=True, text=None,
+             **kwargs):
+        return self._get_element(self.dom, name=name, attrs=attrs, recursive=recursive, text=text,
+                                 **kwargs)
+
+    def find_all(self, name=None, attrs={}, recursive=True, text=None,
+                 limit=None, **kwargs):
+        return self._get_elements(self.dom, name=name, attrs=attrs, recursive=recursive, text=text,
+                                  limit=limit, **kwargs)
 
 
 class Page(Resource, ContainerMixin):
@@ -134,21 +148,11 @@ class Page(Resource, ContainerMixin):
         self.resources = []
         self.frames = []
 
-    def assert_element_in_dom(self, name=None, attrs={}, recursive=True, text=None, **kwargs):
+    def assert_element_in(self, name=None, attrs={}, recursive=True, text=None, **kwargs):
         if self.find(name=name, attrs=attrs, recursive=recursive, text=text, **kwargs):
             return True
         else:
             raise ElementNotFoundError(name=name, attrs=attrs, text=text, **kwargs)
-
-    def find(self, name=None, attrs={}, recursive=True, text=None,
-             **kwargs):
-        return self._get_element(self.dom, name=name, attrs=attrs, recursive=recursive, text=text,
-                                 **kwargs)
-
-    def find_all(self, name=None, attrs={}, recursive=True, text=None,
-                 limit=None, **kwargs):
-        return self._get_elements(self.dom, name=name, attrs=attrs, recursive=recursive, text=text,
-                                  limit=limit, **kwargs)
 
     @property
     def cookies(self):
@@ -299,15 +303,18 @@ class Form(ContainerMixin):
         else:
             raise KeyError("{} not in form fields".format(item))
 
+    def __delitem__(self, item):
+        del self.fields[item]
+
     def __setitem__(self, item, value):
         if item in self.fields:
             self.fields[item].value = value
         elif item in self.files:
             self.files[item].value = value
 
-    async def submit(self, base_url='', embedded_res=False):
+    async def submit(self, base_url='', embedded_res=False, **kwargs):
         return await self._page.browser.request(
-            self.method, url_builder(base_url, self.action), embedded_res=embedded_res, **self._serialize())
+            self.method, url_builder(base_url, self.action), embedded_res=embedded_res, **self._serialize(), **kwargs)
 
 
 class BaseFormField:
@@ -376,6 +383,11 @@ class RadioField:
         self.elements = elements
         self.name = elements[0].attrs.get('name')
         self._value = elements[0].attrs.get('value')
+        self._disabled = bool(elements[0].get('disabled'))
+
+    @property
+    def disabled(self):
+        return self._disabled
 
     @property
     def value(self):
