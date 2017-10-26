@@ -18,10 +18,6 @@ volumemodel = lambda start, end: 10
 
 def scenario():
     return [
-        ['mite.example:journey', 'mite.example:datapool', 'mite.example:volumemodel'],
+        ['mite.example:journey', datapool, volumemodel],
     ]
-
-
-def config():
-    return dict(test_msg='Hello!')
 

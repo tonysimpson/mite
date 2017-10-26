@@ -29,6 +29,9 @@ class WorkTracker:
     def get_runner_total(self, runner_id):
         return sum(self._all_work[runner_id].values())
 
+    def remove_runner(self, runner_id):
+        del self._all_work[runner_id]
+
 
 class RunnerTracker:
     def __init__(self, timeout=10):
@@ -37,6 +40,9 @@ class RunnerTracker:
 
     def update(self, runner_id):
         self._last_seen[runner_id] = time.time()
+
+    def remove_runner(self, runner_id):
+        del self._last_seen[runner_id]
 
     def get_active_count(self):
         t = time.time()
@@ -53,7 +59,7 @@ class Controller:
         self._config_manager = config_manager
         self._start_time = time.time()
     
-    def initialise(self):
+    def hello(self):
         runner_id = next(self._runner_id_gen)
         return runner_id, self._testname, self._config_manager.get_changes_for_runner(runner_id)
 
@@ -62,56 +68,25 @@ class Controller:
 
     def _add_assumed(self, runner_id, work):
         self._work_tracker.add_assumed(runner_id, work)
-
-    def _now(self):
-        return time.time() - self._start_time
-
-    def _get_current_required_work(self):
-        required = self._scenario_manager.get_required_work()
-        current = self._work_tracker.get_total_work()
-        diff = dict(required)
-        for id, current_num in current.items():
-            if id in diff:
-                diff_num = diff[id].number - current_num
-                if diff_num > 0:
-                    diff[id] = diff[id]._replace(number=diff_num)
-                else:
-                    del diff[id]
-        return diff
-
-    def _sum_workitem_dict(self, wi_dict):
-        total = 0
-        for wi in wi_dict.values():
-            total += wi.number
-        return total
-
-    def _gen_required_work_for_runner(self, runner_id):
-        required = self._get_current_required_work()
-        required_total = self._sum_workitem_dict(required)
+    
+    def _required_work_for_runner(self, runner_id, max_work=None):
         runner_total = self._work_tracker.get_runner_total(runner_id)
         active_runners = self._runner_tracker.get_active_count()
-        max_num = max(0, (required_total // active_runners) - runner_total)
-        logger.debug("Controller._gen_required_work_for_runner required=%r" % (required,))
-        for id, wi in required.items():
-            if max_num <= 0:
-                break
-            if max_num < wi.number:
-                yield id, wi._replace(number=max_num)
-                break
-            else:
-                max_num -= wi.number
-                yield id, wi
-    
-    def work_request(self, runner_id, current_work):
+        current_work = self._work_tracker.get_total_work()
+        work, scenario_volume_map = self._scenario_manager.get_work(current_work, runner_total, active_runners, max_work)
+        self._add_assumed(runner_id, scenario_volume_map) 
+        return work
+
+    def work_request(self, runner_id, current_work, completed_data_ids, max_work=None):
         self._set_actual(runner_id, current_work)
         self._runner_tracker.update(runner_id)
-        work = list(self._gen_required_work_for_runner(runner_id))
-        self._add_assumed(runner_id, {id: wi.number for id, wi in work})
-        result = [(id, wi.journey_spec, wi.argument_datapool_id, wi.number, wi.minimum_duration) for id, wi in work]
-        logger.debug('Controller.work_request returning runner_id=%s result=%r', runner_id, result)
-        return result, self._config_manager.get_changes_for_runner(runner_id)
+        self._scenario_manager.checkin_data(completed_data_ids)
+        work = self._required_work_for_runner(runner_id, max_work)
+        logger.debug('Controller.work_request returning runner_id=%s work=%r', runner_id, work)
+        return work, self._config_manager.get_changes_for_runner(runner_id), False
 
-    def checkin_and_checkout(self, runner_id, datapool_id, used_ids):
-        self._scenario_manager.checkin_block(datapool_id, used_ids)
-        return self._scenario_manager.checkout_block(datapool_id)
+    def bye(self, runner_id):
+        self._runner_tracker.remove_runner(runner_id)
+        self._work_tracker.remove_runner(runner_id)
+
 
