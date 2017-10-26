@@ -1,4 +1,9 @@
 from itertools import count
+import logging
+import os
+
+
+logger = logging.getLogger()
 
 
 class ConfigManager:
@@ -31,5 +36,19 @@ class ConfigManager:
 
     def __str__(self):
         self.__repr__()
+
+
+def default_config_loader():
+    result = {}
+    for name, value in os.environ.items():
+        if name.startswith('MITE_CONF_'):
+            key_name = name[10:]
+            logger.info('Setting config from ENV variable [{}] {}={}', name, key_name, value)
+            result[key_name] = value
+        if name.startswith('MITE_EVAL_CONF_'):
+            key_name = name[15:]
+            logger.info('Setting config from ENV variable and eval\'ing value [{}] {}={}', name, key_name, value)
+            result[key_name] = eval(value)
+    return result
 
 

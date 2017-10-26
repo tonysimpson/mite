@@ -15,7 +15,8 @@ setup(
         'msgpack-python',
         'acurl',
         'bs4',
-        'nanomsg'
+        'nanomsg',
+        'flask',
     ],
     entry_points={
         'console_scripts': [
