@@ -312,9 +312,9 @@ class Form(ContainerMixin):
         elif item in self.files:
             self.files[item].value = value
 
-    async def submit(self, base_url='', embedded_res=False):
+    async def submit(self, base_url='', embedded_res=False, **kwargs):
         return await self._page.browser.request(
-            self.method, url_builder(base_url, self.action), embedded_res=embedded_res, **self._serialize())
+            self.method, url_builder(base_url, self.action), embedded_res=embedded_res, **self._serialize(), **kwargs)
 
 
 class BaseFormField:
