@@ -14,25 +14,34 @@ class NanomsgSender:
 
 
 class NanomsgReciever:
-    def __init__(self, socket_address, listeners=None, loop=None):
+    def __init__(self, socket_address, listeners=None, raw_listeners=None, loop=None):
         self._sock = nanomsg.Socket(nanomsg.PULL)
         self._sock.bind(socket_address)
         if listeners is None:
             listeners = []
         self._listeners = listeners
+        if raw_listeners is None:
+            raw_listeners = []
+        self._raw_listeners = raw_listeners
         if loop is None:
             loop = asyncio.get_event_loop()
         self._loop = loop
 
     def add_listener(self, listener):
         self._listeners.append(listener)
+    
+    def add_raw_listener(self, listener):
+        self._raw_listeners.append(listener)
 
     def _recv(self):
-        return unpack_msg(self._sock.recv())
+        return self._sock.recv()
 
-    async def run(self, stop_func):
-        while not stop_func():
-            msg = await self._loop.run_in_executor(None, self._recv)
+    async def run(self, stop_func=None):
+        while stop_func is None or not stop_func():
+            raw = await self._loop.run_in_executor(None, self._recv)
+            for raw_listener in self._raw_listeners:
+                raw_listener(raw)
+            msg = unpack_msg(raw)
             for listener in self._listeners:
                 listener(msg)
 
@@ -77,8 +86,8 @@ class NanomsgControllerServer:
         self._sock = nanomsg.Socket(nanomsg.REP)
         self._sock.bind(socket_address)
 
-    async def run(self, controller, stop_func):
-        while not stop_func():
+    async def run(self, controller, stop_func=None):
+        while stop_func is None or not stop_func():
             _type, content = unpack_msg(self._sock.recv())
             if _type == _MSG_TYPE_HELLO:
                 self._sock.send(pack_msg(controller.hello()))

@@ -50,6 +50,7 @@ class ScenarioManager:
             try:
                 number = int(scenario.volumemodel(start_of_period, end_of_period))
             except StopScenario:
+                logger.info('ScenarioManager.get_work Removed scenario %d due because volume model raised StopScenario', scenario_ids)
                 del self._scenarios[scenario_id]
             else:
                 required[scenario_id] = number
@@ -97,6 +98,7 @@ class ScenarioManager:
                     try:
                         dpi = scenario.datapool.checkout()
                     except DataPoolExhausted:
+                        logger.info('ScenarioManager.get_work Removed scenario %d because data pool exhausted', scenario_ids)
                         del self._scenarios[scenario_id]
                         continue
                     else:
@@ -108,6 +110,9 @@ class ScenarioManager:
                 else:
                     scenario_volume_map[scenario_id] = 1
         return work, scenario_volume_map
+
+    def is_active(self):
+        return self._in_start or bool(self._scenarios)
 
     def checkin_data(self, ids):
         for scenario_id, scenario_data_id in ids:

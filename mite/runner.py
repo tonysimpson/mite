@@ -1,6 +1,7 @@
 import asyncio
 from itertools import count
 from collections import deque
+import concurrent.futures
 import time
 import logging
 
@@ -129,7 +130,7 @@ class Runner:
                 future = asyncio.ensure_future(self._execute(context, scenario_id, scenario_data_id, journey_spec, args, delay=delay))
                 running.append(future)
             if running:
-                completed, _running = await asyncio.wait(running, timeout=self._loop_wait)
+                completed, _running = await asyncio.wait(running, timeout=self._loop_wait, return_when=concurrent.futures.FIRST_COMPLETED)
                 running = list(_running)
                 completed_data_ids = [(scenario_id, scenario_data_id) for scenario_id, scenario_data_id in [i.result() for i in completed] if scenario_data_id is not None]
             else:
@@ -138,10 +139,10 @@ class Runner:
         while running:
             _, config_list, _ = await self._transport.request_work(runner_id, self._current_work(), completed_data_ids, 0)
             config._update(config_list)
-            completed, running = await asyncio.wait(running, timeout=self._loop_wait)
+            completed, running = await asyncio.wait(running, timeout=self._loop_wait, return_when=concurrent.futures.FIRST_COMPLETED)
             completed_data_ids = [(scenario_id, scenario_data_id) for scenario_id, scenario_data_id in [i.result() for i in completed] if scenario_data_id is not None]
         await self._transport.request_work(runner_id, self._current_work(), completed_data_ids, 0)
-        self._transport.bye(runner_id)
+        await self._transport.bye(runner_id)
 
     async def _execute(self, context, scenario_id, scenario_data_id, journey_spec, args, delay=0):
         logger.debug('Runner._execute starting scenario_id=%r scenario_data_id=%r journey_spec=%r args=%r delay=%r', scenario_id, scenario_data_id, journey_spec, args, delay)

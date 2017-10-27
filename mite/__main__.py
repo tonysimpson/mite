@@ -4,8 +4,9 @@ Mite Load Test Framewwork.
 Usage:
     mite [options] journey test JOURNEY_SPEC [DATAPOOL_SPEC] VOLUME_MODEL_SPEC
     mite [options] scenario test SCENARIO_SPEC
-    mite [options] controller SCENARIO_SPEC [--controller-socket=SOCKET] [--message-socket=SOCKET]
-    mite [options] runner [--controller-socket=SOCKET] [--message-socket=SOCKET]
+    mite controller SCENARIO_SPEC [--controller-socket=SOCKET] [--message-socket=SOCKET] [--delay-start-seconds=DELAY]
+    mite runner [--controller-socket=SOCKET] [--message-socket=SOCKET]
+    mite collector [--message-socket=SOCKET] [--web-address=HOST_POST] [--no-web]
     mite --help
     mite --version
 
@@ -19,14 +20,15 @@ Examples:
     mite scenario test mite.example:scenario
 
 Options:
-    -h --help                   Show this screen.
-    --version                   Show version
-    --log-level=LEVEL           Set logger level, one of DEBUG, INFO, WARNING, ERROR, CRITICAL [default: WARNING]
-    --config=CONFIG_SPEC        Set a config loader to a callable loaded via a spec [default: mite.config:default_config_loader]
-    --no-web                    Don't start the build in webserver
-    --web-address=HOST_POST     Web bind address [default: 127.0.0.1:9301]
-    --controller-socket=SOCKET  Controller socket [default: tcp://127.0.0.1:14301]
-    --message-socket=SOCKET     Message socket [default: tcp://127.0.0.1:14302]
+    -h --help                       Show this screen.
+    --version                       Show version
+    --log-level=LEVEL               Set logger level, one of DEBUG, INFO, WARNING, ERROR, CRITICAL [default: INFO]
+    --config=CONFIG_SPEC            Set a config loader to a callable loaded via a spec [default: mite.config:default_config_loader]
+    --no-web                        Don't start the build in webserver
+    --web-address=HOST_POST         Web bind address [default: 127.0.0.1:9301]
+    --controller-socket=SOCKET      Controller socket [default: tcp://127.0.0.1:14301]
+    --message-socket=SOCKET         Message socket [default: tcp://127.0.0.1:14302]
+    --delay-start-seconds=DELAY     Delay start allowing others to connect [default: 10]
 """
 import asyncio
 import docopt
@@ -36,6 +38,7 @@ from .scenario import ScenarioManager
 from .config import ConfigManager
 from .controller import Controller
 from .runner import Runner
+from .collector import Collector
 from .utils import spec_import, pack_msg
 from .web import app, metrics_processor
 from .nanomsg import NanomsgSender, NanomsgReciever, NanomsgRunnerTransport, NanomsgControllerServer
@@ -68,7 +71,9 @@ def _msg_handler(msg):
         print(msg['stacktrace'])
 
 
-def _start_web_in_thread(opts):
+def _maybe_start_web_in_thread(opts):
+    if opts['--no-web']:
+        return
     address = opts['--web-address']
     kwargs = {'port': 9301}
     if address.startswith('['):
@@ -99,8 +104,7 @@ def _create_config_manager(opts):
 
 
 def test_scenarios(test_name, opts, scenarios):
-    if not opts['--no-web']:
-        _start_web_in_thread(opts)
+    _maybe_start_web_in_thread(opts)
     scenario_manager = ScenarioManager()
     for journey_spec, datapool, volumemodel in scenarios:
         scenario_manager.add_scenario(journey_spec, datapool, volumemodel)
@@ -141,18 +145,29 @@ def journey_cmd(opts):
 def controller(opts):
     scenario_spec = opts['SCENARIO_SPEC']
     scenarios = spec_import(scenario_spec)()
-    scenario_manager = ScenarioManager(start_delay=10)
+    scenario_manager = ScenarioManager(start_delay=float(opts['--delay-start-seconds']))
     for journey_spec, datapool, volumemodel in scenarios:
         scenario_manager.add_scenario(journey_spec, datapool, volumemodel)
     config_manager = _create_config_manager(opts)
     controller = Controller(scenario_spec, scenario_manager, config_manager)
     server = NanomsgControllerServer(opts['--controller-socket'])
-    asyncio.get_event_loop().run_until_complete(server.run(controller, lambda: False))
+    asyncio.get_event_loop().run_until_complete(server.run(controller, controller.should_stop))
 
 
 def runner(opts):
     transport = NanomsgRunnerTransport(opts['--controller-socket'])
-    asyncio.get_event_loop().run_until_complete(Runner(transport, _msg_handler).run())
+    sender = NanomsgSender(opts['--message-socket'])
+    asyncio.get_event_loop().run_until_complete(Runner(transport, sender.send).run())
+
+
+def collector(opts):
+    _maybe_start_web_in_thread(opts)
+    reciever = NanomsgReciever(opts['--message-socket'])
+    collector = Collector()
+    reciever.add_listener(metrics_processor.process_message)
+    reciever.add_listener(collector.process_message)
+    reciever.add_raw_listener(collector.process_raw_message)
+    asyncio.get_event_loop().run_until_complete(reciever.run())
 
 
 def main():
@@ -166,6 +181,8 @@ def main():
         controller(opts)
     elif opts['runner']:
         runner(opts)
+    elif opts['collector']:
+        collector(opts)
 
 
 if __name__ == '__main__':
