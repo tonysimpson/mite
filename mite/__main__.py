@@ -2,8 +2,8 @@
 Mite Load Test Framewwork.
 
 Usage:
-    mite [options] journey test JOURNEY_SPEC [DATAPOOL_SPEC] VOLUME_MODEL_SPEC
     mite [options] scenario test SCENARIO_SPEC
+    mite [options] journey test JOURNEY_SPEC [DATAPOOL_SPEC] [--volume=VOLUME]
     mite controller SCENARIO_SPEC [--controller-socket=SOCKET] [--message-socket=SOCKET] [--delay-start-seconds=DELAY]
     mite runner [--controller-socket=SOCKET] [--message-socket=SOCKET]
     mite collector [--message-socket=SOCKET] [--web-address=HOST_POST] [--no-web]
@@ -29,6 +29,7 @@ Options:
     --controller-socket=SOCKET      Controller socket [default: tcp://127.0.0.1:14301]
     --message-socket=SOCKET         Message socket [default: tcp://127.0.0.1:14302]
     --delay-start-seconds=DELAY     Delay start allowing others to connect [default: 10]
+    --volume=VOLUME                 Volume to run journey at [default: 1]
 """
 import asyncio
 import docopt
@@ -122,13 +123,12 @@ def scenario_test_cmd(opts):
 
 def journey_test_cmd(opts):
     journey_spec = opts['JOURNEY_SPEC']
-    volume_model_spec = opts['VOLUME_MODEL_SPEC']
     datapool_spec = opts['DATAPOOL_SPEC']
     if datapool_spec:
         datapool = spec_import(datapool_spec)
     else:
         datapool = None
-    volumemodel = spec_import(volume_model_spec)
+    volumemodel = lambda start, end: int(opts['--volume'])
     test_scenarios(journey_spec, opts, [(journey_spec, datapool, volumemodel)])
 
 
