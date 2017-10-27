@@ -60,16 +60,15 @@ class KeyedHistogram:
 
 
 _response_key = namedtuple('_response_key', 'test journey transaction method code'.split())
-_error_key = namedtuple('_error_key', 'test journey transaction'.split())
+_journey_key = namedtuple('_journey_key', 'test journey transaction'.split())
 
 
 class MetricsProcessor:
     def __init__(self):
         self._error_counter = KeyedMetricsCounter()
+        self._transaction_start_counter = KeyedMetricsCounter()
+        self._transaction_end_counter = KeyedMetricsCounter()
         self._response_counter = KeyedMetricsCounter()
-        self._dns_time_sum_counter = KeyedMetricsSumCounter()
-        self._connect_time_sum_counter = KeyedMetricsSumCounter()
-        self._tls_time_sum_counter = KeyedMetricsSumCounter()
         self._response_histogram = KeyedHistogram([0.00001, 0.0001, 0.001,
             0.01, 0.05, 0.1, 0.15, 0.2, 0.4, 0.6, 0.8, 1, 2, 4, 8, 16])
 
@@ -87,16 +86,28 @@ class MetricsProcessor:
             )
             self._response_counter.inc(key)
             self._response_histogram.add(key, msg['total_time'])
-            #self._dns_time_sum.add(key, msg['dns_time'])
-            #self._connect_time_sum.add(key, msg['connect_time'] - msg['dns_time'])
-            #self._tls_time_sum.add(key, msg['tls_time'] - msg['connect_time'])
         elif msg_type == 'exception' or msg_type == 'error':
-            key = _error_key(
+            key = _journey_key(
                 msg.get('test', ''),
                 msg.get('journey', ''),
                 msg.get('transation', ''),
             )
             self._error_counter.inc(key)
+        elif msg_type == 'start':
+            key = _journey_key(
+                msg.get('test', ''),
+                msg.get('journey', ''),
+                msg.get('transation', ''),
+            )
+            self._transaction_start_counter.inc(key)
+        elif msg_type == 'end':
+            key = _journey_key(
+                msg.get('test', ''),
+                msg.get('journey', ''),
+                msg.get('transation', ''),
+            )
+            self._transaction_end_counter.inc(key)
+            
 
     def prometheus_metrics(self):
         def format_dict(d):
@@ -109,6 +120,14 @@ class MetricsProcessor:
         lines.append('# TYPE mite_journey_error_total counter')
         for key, value in self._error_counter.iter_counts():
             lines.append('mite_journey_error_total {%s} %s' % (format_dict(key._asdict()), value))
+        lines.append('')
+        lines.append('# TYPE mite_transaction_start_total counter')
+        for key, value in self._transaction_start_counter.iter_counts():
+            lines.append('mite_http_transaction_start_total {%s} %s' % (format_dict(key._asdict()), value))
+        lines.append('')
+        lines.append('# TYPE mite_transaction_end_total counter')
+        for key, value in self._transaction_end_counter.iter_counts():
+            lines.append('mite_transaction_end_total {%s} %s' % (format_dict(key._asdict()), value))
         lines.append('')
         lines.append('# TYPE mite_http_response_time_seconds histogram')
         for key, _sum, _total_count, bin_counts in  self._response_histogram.iter_histograms():
