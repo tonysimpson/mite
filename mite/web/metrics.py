@@ -123,7 +123,7 @@ class MetricsProcessor:
         lines.append('')
         lines.append('# TYPE mite_transaction_start_total counter')
         for key, value in self._transaction_start_counter.iter_counts():
-            lines.append('mite_http_transaction_start_total {%s} %s' % (format_dict(key._asdict()), value))
+            lines.append('mite_transaction_start_total {%s} %s' % (format_dict(key._asdict()), value))
         lines.append('')
         lines.append('# TYPE mite_transaction_end_total counter')
         for key, value in self._transaction_end_counter.iter_counts():
