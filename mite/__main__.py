@@ -68,8 +68,24 @@ def _msg_handler(msg):
         print(msg['stacktrace'])
 
 
-def _start_web_in_thread(host, port):
-    t = threading.Thread(target=app.run, name='mite.web', kwargs={'host': host, 'port': port})
+def _start_web_in_thread(opts):
+    address = opts['--web-address']
+    kwargs = {'port': 9301}
+    if address.startswith('['):
+            # IPV6 [host]:port
+        if ']:' in address:
+            host, port = address.split(']:')
+            kwargs['host'] = host[1:]
+            kwargs['port'] = int(port)
+        else:
+            kwargs['host'] = address[1:-1]
+    elif address.count(':') == 1:
+        host, port = address.split(':')
+        kwargs['host'] = host
+        kwargs['port'] = int(port)
+    else:
+        kwargs['host'] = address
+    t = threading.Thread(target=app.run, name='mite.web', kwargs=kwargs)
     t.daemon = True
     t.start()
 
@@ -84,7 +100,7 @@ def _create_config_manager(opts):
 
 def test_scenarios(test_name, opts, scenarios):
     if not opts['--no-web']:
-        _start_web_in_thread(opts['--web-host'], int(opts['--web-port']))
+        _start_web_in_thread(opts)
     scenario_manager = ScenarioManager()
     for journey_spec, datapool, volumemodel in scenarios:
         scenario_manager.add_scenario(journey_spec, datapool, volumemodel)
