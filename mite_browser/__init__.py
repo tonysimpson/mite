@@ -49,8 +49,9 @@ def browser_decorator(separation=0):
 
 class Browser:
     """Browser abstraction wraps a session and provides some behaviour that is closer to a real browser."""
-    def __init__(self, session):
+    def __init__(self, session, embedded_res=False):
         self._session = session
+        self._embedded_res = embedded_res
 
     async def _download_resource(self, url, page, type):
         """Download a resource and then register it with the page it came from."""
@@ -66,7 +67,7 @@ class Browser:
     async def request(self, method, url, *args, **kwargs):
         """Perform a request and return a page object"""
         # Wrap everything in page object
-        embedded_res = kwargs.pop("embedded_res", False)
+        embedded_res = kwargs.pop("embedded_res", self._embedded_res)
         resp = await self._session.request(method, url, *args, **kwargs)
         page = Page(resp, self)
         if embedded_res:
