@@ -1,6 +1,6 @@
 import asyncio
 from bs4 import BeautifulSoup
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urljoin
 from re import compile as re_compile, IGNORECASE, escape
 from mite import MiteError, ensure_fixed_seperation
 import mite_http
@@ -18,17 +18,9 @@ class ElementNotFoundError(MiteError):
 
 def url_builder(base_url, *args, **kwargs):
     new_args = []
-    if args:
-        url = base_url[:-1] if base_url.endswith('/') else base_url
-        for arg in args:
-            if arg.endswith('/') and arg != args[-1]:
-                arg = arg[:-1]
-            if not arg.startswith('/'):
-                arg = ''.join(['/', arg])
-            new_args.append(arg)
-        url = ''.join([url, ''.join(new_args)])
-    else:
-        url = base_url
+    url = base_url
+    for arg in args:
+        url = urljoin(url, arg)
     if kwargs:
         url = ''.join([url, '?', urlencode(kwargs)])
     return url
@@ -174,17 +166,17 @@ class Page(Resource, ContainerMixin):
     @property
     def resources_with_embedabbles(self):
         """Any sub-resources of a page which might also contain their own embedded resources"""
-        return self.frames + self.stylesheets
+        return self.frames# + self.stylesheets
 
     def _register_resource(self, response, rtype):
         if rtype == 'resource':
-            self.resources.append(Resource(response))
+            self.resources.append(Resource(response, self.browser))
         elif rtype == 'script':
-            self.scripts.append(Script(response))
+            self.scripts.append(Script(response, self.browser))
         elif rtype == 'stylesheet':
-            self.stylesheets.append(Stylesheet(response))
+            self.stylesheets.append(Stylesheet(response, self.browser))
         elif rtype == 'page':
-            self.frames.append(Page(response))
+            self.frames.append(Page(response, self.browser))
 
     def _extract_embeded_urls(self):
         """Extracts all embedded resources from a page"""
@@ -211,8 +203,9 @@ class Page(Resource, ContainerMixin):
         for elem in self.dom.find_all('object', attrs={'data': True}):
             yield url_builder(base_url, elem.attrs['data']), 'resource'
         for elem in self.dom.find_all(True, attrs={'style': True}):
-            yield url_builder(
-                base_url, re_compile("url\(\s*[\"'](.*)[\"']\s*\)", IGNORECASE).match(elem.attrs['style'])), 'resource'
+            if elem.attrs['style'].strip().startswith('url('):
+                url = elem.attrs['style'].split('url(', 1)[-1].rsplit(')', 1)[0]
+                yield url_builder(base_url, url), 'resource'
 
     async def on_dom_ready(self):
         # awaitable dom ready
@@ -233,17 +226,17 @@ class Page(Resource, ContainerMixin):
 
 
 class Script(Resource):
-    def __init__(self, response):
-        super().__init__(response)
+    def __init__(self, response, browser):
+        super().__init__(response, browser)
 
 
 class Stylesheet(Resource):
     """Stylesheet object"""
-    def __init__(self, response):
-        super().__init__(response)
+    def __init__(self, response, browser):
+        super().__init__(response, browser)
         self.resources = []
 
-    def _extract_embedded_urls(self):
+    def _extract_embeded_urls(self):
         """Extracts embedded resources from a stylesheet"""
         base_url = self.response.url
         for match in re_compile("url\(\s*[\"'](.*)[\"']\s*\)", IGNORECASE).finditer(self.response.text):
@@ -297,6 +290,7 @@ class Form(ContainerMixin):
                 else:
                     yield BaseFormField(field)
 
+
     def __getitem__(self, item):
         result = self.fields.get(item) or self.files.get(item)
         if result:
@@ -314,6 +308,8 @@ class Form(ContainerMixin):
             self.files[item].value = value
 
     async def submit(self, base_url='', embedded_res=False, **kwargs):
+        if base_url == '':
+            base_url = self._page.response.url
         return await self._page.browser.request(
             self.method, url_builder(base_url, self.action), embedded_res=embedded_res, **self._serialize(), **kwargs)
 
