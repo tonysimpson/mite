@@ -7,8 +7,8 @@ import mite_http
 
 
 class OptionError(MiteError):
-    def __init__(self, value):
-        super().__init__("Attempted to set a value not in options", value=value)
+    def __init__(self, value, options):
+        super().__init__("%r not in options %r" % (value, options), value=value, options=options)
 
 
 class ElementNotFoundError(MiteError):
@@ -211,8 +211,12 @@ class Page(Resource, ContainerMixin):
         # awaitable dom ready
         pass
 
-    def get_form(self, attrs=None, text=None, **kwargs):
-        return Form(self._get_element(self.dom, 'form', attrs, text, **kwargs), self)
+    def get_form(self, name=None):
+        form, = [f for f in self.get_forms() if name is None or f.name == name]
+        return form
+
+    def get_forms(self):
+        return [Form(e, self) for e in self.dom.find_all('form')]
 
     async def click_link(self, attrs=None, text=None, **kwargs):
         return await self.browser.get(
@@ -220,9 +224,6 @@ class Page(Resource, ContainerMixin):
 
     def __repr__(self):
         return str(self.dom)
-
-    def __str__(self):
-        return self.__repr__()
 
 
 class Script(Resource):
@@ -247,8 +248,9 @@ class Form(ContainerMixin):
     def __init__(self, element, page):
         self._page = page
         self.element = element
-        self.method = element.get('method').upper()
+        self.method = element.get('method', 'POST').upper()
         self.action = element.get('action')
+        self.name = element.get('name', element.get('id'))
         self.fields = {}
         self.files = {}
         self._set_fields()
@@ -277,7 +279,7 @@ class Form(ContainerMixin):
             elif field.name == 'textarea':
                 yield BaseFormField(field)
             elif field.name == 'input':
-                if field.attrs['type'] in ['reset', 'submit']:
+                if field.attrs['type'] in ['reset', 'submit', 'button']:
                     continue
                 elif field.attrs['type'] == 'file':
                     yield FileInputField(field)
@@ -308,6 +310,8 @@ class Form(ContainerMixin):
             self.fields[item].value = value
         elif item in self.files:
             self.files[item].value = value
+        else:
+            raise KeyError(item)
 
     async def submit(self, base_url='', embedded_res=False, **kwargs):
         if base_url == '':
@@ -315,13 +319,20 @@ class Form(ContainerMixin):
         return await self._page.browser.request(
             self.method, url_builder(base_url, self.action), embedded_res=embedded_res, **self._serialize(), **kwargs)
 
+    def __repr__(self):
+        return '<%s name=%r method=%r action=%r fields=%r files=%r>' % (self.__class__.__name__, self.name, self.method, self.action, self.fields, self.files)
+
+
+def _field_is_disabled(element):
+    return element.get('disabled') is not None and disabled.lower() in ['disabled', 'true']
+
 
 class BaseFormField:
     def __init__(self, element):
         self.element = element
         self.name = element.attrs.get('name')
         self._value = element.attrs.get('value')
-        self._disabled = bool(element.get('disabled'))
+        self._disabled = _field_is_disabled(element)
 
     @property
     def disabled(self):
@@ -341,6 +352,9 @@ class BaseFormField:
     def value(self, value):
         self._value = value
 
+    def __repr__(self):
+        return '<%s name=%r value=%r disabled=%r>' % (self.__class__.__name__, self.name, self.value, self.disabled)
+
 
 class SelectField(BaseFormField):
     def __init__(self, element):
@@ -359,7 +373,7 @@ class SelectField(BaseFormField):
     #    if value in self.options:
     #        self._value = value
     #    else:
-    #        raise OptionError(value)
+    #        raise OptionError(value, self.options)
 
 
 class CheckboxField(BaseFormField):
@@ -382,7 +396,8 @@ class RadioField:
         self.elements = elements
         self.name = elements[0].attrs.get('name')
         self._value = elements[0].attrs.get('value')
-        self._disabled = bool(elements[0].get('disabled'))
+        self._disabled = _field_is_disabled(elements[0])
+        self.options = [e.get('value') for e in self.elements]
 
     @property
     def disabled(self):
@@ -394,10 +409,13 @@ class RadioField:
 
     @value.setter
     def value(self, value):
-        if value in [e.get('value') for e in self.elements]:
+        if value in self.options:
             self._value = value
         else:
-            raise OptionError(value)
+            raise OptionError(value, self.options)
+
+    def __repr__(self):
+        return '<%s name=%r value=%r options=%r disabled=%r>' % (self.__class__.__name__, self.name, self.value, self.options, self.disabled)
 
 
 class FileInputField(BaseFormField):
