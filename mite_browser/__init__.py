@@ -270,6 +270,7 @@ class Form(ContainerMixin):
     def _extract_fields_as_subtype(self):
         FIELD_TYPES = ['select', 'textarea', 'input']
         fields = self.element.find_all(FIELD_TYPES)
+        radio_field_names = set()
         for field in fields:
             if field.name == 'select':
                 yield SelectField(field)
@@ -281,15 +282,16 @@ class Form(ContainerMixin):
                 elif field.attrs['type'] == 'file':
                     yield FileInputField(field)
                 elif field.attrs['type'] == 'radio':
-                    radios = [f for f in fields[:] if f.attrs['name'] == field.attrs['name']]
-                    for r in radios:
-                        fields.remove(r)
+                    radio_field_name = field.attrs['name']
+                    if radio_field_name in radio_field_names:
+                        continue
+                    radio_field_names.add(radio_field_name)
+                    radios = [f for f in fields if f.attrs['name'] == radio_field_name]
                     yield RadioField(radios)
                 elif field.attrs['type'] == 'checkbox':
                     yield CheckboxField(field)
                 else:
                     yield BaseFormField(field)
-
 
     def __getitem__(self, item):
         result = self.fields.get(item) or self.files.get(item)
