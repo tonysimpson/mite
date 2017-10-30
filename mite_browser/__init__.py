@@ -296,7 +296,8 @@ class Form:
         elif item in self.files:
             self.files[item].value = value
         else:
-            raise KeyError(item)
+            #Fudge to create a fake form field
+            self.fields[item] = FakeFormField(item, value)
 
     async def submit(self, base_url='', embedded_res=False, **kwargs):
         if base_url == '':
@@ -309,7 +310,8 @@ class Form:
 
 
 def _field_is_disabled(element):
-    return element.get('disabled') is not None and disabled.lower() in ['disabled', 'true']
+    status = element.get('disabled')
+    return status is not None and status.lower() in ['disabled', 'true']
 
 
 class BaseFormField:
@@ -411,4 +413,15 @@ class FileInputField(BaseFormField):
     @BaseFormField.value.setter
     def value(self, file):
         self._value.append(file)
+
+
+class FakeFormField:
+    """For adding in fields that don't already exist. Shouldn't be necessary in most cases but loadrunner tests needed
+    it."""
+
+    def __init__(self, name, value, disabled=False):
+        self.element = None
+        self.name = name
+        self.value = value
+        self.disabled = disabled
 
