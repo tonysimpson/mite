@@ -93,45 +93,7 @@ class Resource:
         self.browser = browser
 
 
-class ContainerMixin:
-    """Mixin for things which need to find elements within themselves"""
-
-    @staticmethod
-    def _get_element(root_elem, name=None, attrs=None, text=None, recursive=True, **kwargs):
-        # Bs4 text doesn't work with other finders according to robobrowser so split off.
-        matches = root_elem.find_all(name, attrs, recursive, None, **kwargs)
-        if not matches:
-            return None
-        if not text:
-            return matches[0]
-        text = re_compile(escape(text), IGNORECASE)
-        for match in matches:
-            if text.search(match.text):
-                return match
-
-    @staticmethod
-    def _get_elements(root_elem, name=None, attrs=None, text=None, recursive=True, **kwargs):
-        # Bs4 text doesn't work with other finders according to robobrowser so split off.
-        matches = root_elem.find_all(name, attrs, recursive, None, **kwargs)
-        if not matches:
-            return []
-        if not text:
-            return matches
-        text = re_compile(escape(text), IGNORECASE)
-        return [match for match in matches if text.search(match.text)]
-
-    def find(self, name=None, attrs={}, recursive=True, text=None,
-             **kwargs):
-        return self._get_element(self.dom, name=name, attrs=attrs, recursive=recursive, text=text,
-                                 **kwargs)
-
-    def find_all(self, name=None, attrs={}, recursive=True, text=None,
-                 limit=None, **kwargs):
-        return self._get_elements(self.dom, name=name, attrs=attrs, recursive=recursive, text=text,
-                                  limit=limit, **kwargs)
-
-
-class Page(Resource, ContainerMixin):
+class Page(Resource):
     """Page object built from a HTML response."""
     def __init__(self, response, browser):
         super().__init__(response, browser)
@@ -163,6 +125,14 @@ class Page(Resource, ContainerMixin):
     def status_code(self):
         return self.response.status_code
 
+    def find_all(self, *args, **kwargs):
+        """Calls self.dom.find_all"""
+        return self.dom.find_all(*args, **kwargs)
+
+    def find(self, *args, **kwargs):
+        """Calls self.dom.find"""
+        return self.dom.find(*args, **kwargs)
+
     @property
     def resources_with_embedabbles(self):
         """Any sub-resources of a page which might also contain their own embedded resources"""
@@ -182,27 +152,27 @@ class Page(Resource, ContainerMixin):
         """Extracts all embedded resources from a page"""
         # TODO: Look into prerender and whether we should be getting these resources.
         base_url = self.response.url
-        for burl in self.dom.find_all('base', {'href': True}):
+        for burl in self.find_all('base', {'href': True}):
             base_url = burl.attrs['href'] # reset the base url to the one in the page
-        for elem in self.dom.find_all(True, attrs={'background': True}):
+        for elem in self.find_all(True, attrs={'background': True}):
             yield url_builder(base_url, elem.attrs['background']), 'resource'
-        for elem in self.dom.find_all(['img', 'embed', 'bgsound'], attrs={'src': True}):
+        for elem in self.find_all(['img', 'embed', 'bgsound'], attrs={'src': True}):
             yield url_builder(base_url, elem.attrs['src']), 'resource'
-        for elem in self.dom.find_all(['script'], attrs={'src': True}):
+        for elem in self.find_all(['script'], attrs={'src': True}):
             yield url_builder(base_url, elem.attrs['src']), 'script'
-        for elem in self.dom.find_all(['frame', 'iframe'], attrs={'src': True}):
+        for elem in self.find_all(['frame', 'iframe'], attrs={'src': True}):
             yield url_builder(base_url, elem.attrs['src']), 'page'
-        for elem in self.dom.find_all('link', attrs={'rel': 'stylesheet', 'href': True}):
+        for elem in self.find_all('link', attrs={'rel': 'stylesheet', 'href': True}):
             yield url_builder(base_url, elem.attrs['href']), 'stylesheet'
-        for elem in self.dom.find_all('input', attrs={'type': 'image', 'href': True}):
+        for elem in self.find_all('input', attrs={'type': 'image', 'href': True}):
             yield url_builder(base_url, elem.attrs['href']), 'resource'
-        for elem in self.dom.find_all('applet', attrs={'code': True}):
+        for elem in self.find_all('applet', attrs={'code': True}):
             yield url_builder(base_url, elem.attrs['code']), 'resource'
-        for elem in self.dom.find_all('object', attrs={'codebase': True}):
+        for elem in self.find_all('object', attrs={'codebase': True}):
             yield url_builder(base_url, elem.attrs['codebase']), 'resource'
-        for elem in self.dom.find_all('object', attrs={'data': True}):
+        for elem in self.find_all('object', attrs={'data': True}):
             yield url_builder(base_url, elem.attrs['data']), 'resource'
-        for elem in self.dom.find_all(True, attrs={'style': True}):
+        for elem in self.find_all(True, attrs={'style': True}):
             if elem.attrs['style'].strip().startswith('url('):
                 url = elem.attrs['style'].split('url(', 1)[-1].rsplit(')', 1)[0]
                 yield url_builder(base_url, url), 'resource'
@@ -216,12 +186,27 @@ class Page(Resource, ContainerMixin):
         return form
 
     def get_forms(self):
-        return [Form(e, self) for e in self.dom.find_all('form')]
+        return [Form(e, self) for e in self.find_all('form')]
 
-    async def click_link(self, attrs=None, text=None, **kwargs):
-        return await self.browser.get(
-            self._get_element(self.dom, 'a', attrs=attrs, text=text, **kwargs).attrs['href'])
-
+    async def click_link(self, text):
+        elem = self.find('a', text=text)
+        href = elem.attrs['href']
+        return await self.browser.get(url_builder(self.response.url, href))
+    
+    async def xhr_request(self, method, rel_or_abs_url, *, formdata=None, data=None, json=None, **kwargs):
+        headers = {
+            'Referer': self.response.url,
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+        if formdata is not None:
+            assert data is None
+            data = urlencode(formdata)
+            headers['Content-Type'] = 'application/x-www-form-urlencoded; charset=UTF-8'
+        return await self.browser._session.request(method, url_builder(self.response.url, rel_or_abs_url), data=data, json=json, headers=headers)
+        
+    async def xhr_post(self, rel_or_abs_url, *, formdata=None, data=None, json=None, **kwargs):
+        return await self.xhr_request('POST', rel_or_abs_url, formdata=formdata, data=data, json=json, **kwargs)
+    
     def __repr__(self):
         return str(self.dom)
 
@@ -244,7 +229,7 @@ class Stylesheet(Resource):
             yield url_builder(base_url, match)
 
 
-class Form(ContainerMixin):
+class Form:
     def __init__(self, element, page):
         self._page = page
         self.element = element
