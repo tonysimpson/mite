@@ -1,14 +1,10 @@
 #!/usr/bin/env python
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name = 'mite',
-    packages=[
-        'mite',
-        'mite_http',
-        'mite_browser'
-    ],
+    packages=find_packages(),
     version='0.0.1a',
     install_requires=[
         'docopt',
