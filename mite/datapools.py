@@ -60,7 +60,7 @@ class IterableFactoryDataPool:
             if _id not in self._checked_out:
                 self._checked_out.add(_id)
                 return DataPoolItem(_id, data)
-            if _id < last_id:
+            if _id <= last_id:
                 return None
             last_id = _id
     
