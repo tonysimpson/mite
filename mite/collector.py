@@ -2,6 +2,7 @@ import time
 import os
 from itertools import count
 import logging
+from .utils import pack_msg
 
 
 logger = logging.getLogger(__name__)
