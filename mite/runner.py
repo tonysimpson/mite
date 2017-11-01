@@ -9,7 +9,6 @@ from .context import Context
 from .utils import spec_import
 from . import MiteError
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -76,14 +75,18 @@ class RunnerConfig:
 
 
 class Runner:
-    def __init__(self, transport, msg_sender, loop_wait=1, max_work=None):
+    def __init__(self, transport, msg_sender, loop_wait_min=0.01, loop_wait_max=0.5, max_work=None, loop=None):
         self._transport = transport
         self._msg_sender = msg_sender
         self._work = {}
         self._datapool_proxies = {}
         self._stop = False
-        self._loop_wait = loop_wait
+        self._loop_wait_min = loop_wait_min
+        self._loop_wait_max = loop_wait_max
         self._max_work = max_work
+        if loop is None:
+            loop = asyncio.get_event_loop()
+        self._loop = loop
 
     def _inc_work(self, id):
         if id in self._work:
@@ -97,11 +100,47 @@ class Runner:
             del self._work[id]
 
     def _current_work(self):
-        logger.debug("Runner current_work=%r", self._work)
         return self._work
 
     def should_stop(self):
         return self._stop
+    
+    async def complete_running(self, fs, min_time, max_time):
+        if not fs:
+            await asyncio.sleep(max_time)
+            return [], []
+        start_time = time.time()
+        waiter = self._loop.create_future()
+        def stop_waiting(waiter):
+            if not waiter.done():
+                waiter.set_result(None)
+
+        timeout_handle = self._loop.call_later(max_time, stop_waiting, waiter)
+        def on_completion(f):
+            nonlocal waiter
+            if not waiter.done():
+                waiter.set_result(None)
+
+        for f in fs:
+            f.add_done_callback(on_completion)
+        await waiter
+        for f in fs:
+            f.remove_done_callback(on_completion)
+        timeout_handle.cancel()
+        delay = min_time - (time.time() - start_time)
+        if delay > 0:
+            await asyncio.sleep(delay)
+        completed_data_ids = []
+        still_running = []
+        for f in fs:
+            if f.done():
+                scenario_id, scenario_data_id = f.result()
+                self._dec_work(scenario_id)
+                if scenario_data_id is not None:
+                    completed_data_ids.append((scenario_id, scenario_data_id))
+            else:
+                still_running.append(f)
+        return still_running, completed_data_ids
 
     async def run(self):
         context_id_gen = count(1)
@@ -114,7 +153,6 @@ class Runner:
         while not self._stop:
             work, config_list, self._stop = await self._transport.request_work(runner_id, self._current_work(), completed_data_ids, self._max_work)
             config._update(config_list)
-            logger.debug("requested_work=%r", work)
             work_len = len(work)
             for num, (scenario_id, scenario_data_id, journey_spec, args) in enumerate(work):
                 id_data = {
@@ -126,28 +164,19 @@ class Runner:
                     'scenario_data_id': scenario_data_id
                 }
                 context = Context(self._msg_sender, config, id_data=id_data, should_stop_func=self.should_stop)
-                delay = self._loop_wait * (num / work_len)
-                future = asyncio.ensure_future(self._execute(context, scenario_id, scenario_data_id, journey_spec, args, delay=delay))
+                self._inc_work(scenario_id)
+                future = asyncio.ensure_future(self._execute(context, scenario_id, scenario_data_id, journey_spec, args))
                 running.append(future)
-            if running:
-                completed, _running = await asyncio.wait(running, timeout=self._loop_wait, return_when=concurrent.futures.FIRST_COMPLETED)
-                running = list(_running)
-                completed_data_ids = [(scenario_id, scenario_data_id) for scenario_id, scenario_data_id in [i.result() for i in completed] if scenario_data_id is not None]
-            else:
-                await asyncio.sleep(self._loop_wait)
-                completed_data_ids = []
+            running, completed_data_ids = await self.complete_running(running, self._loop_wait_min, self._loop_wait_max)
         while running:
             _, config_list, _ = await self._transport.request_work(runner_id, self._current_work(), completed_data_ids, 0)
             config._update(config_list)
-            completed, running = await asyncio.wait(running, timeout=self._loop_wait, return_when=concurrent.futures.FIRST_COMPLETED)
-            completed_data_ids = [(scenario_id, scenario_data_id) for scenario_id, scenario_data_id in [i.result() for i in completed] if scenario_data_id is not None]
+            running, completed_data_ids = await self.complete_running(running, self._loop_wait_min, self._loop_wait_max)
         await self._transport.request_work(runner_id, self._current_work(), completed_data_ids, 0)
         await self._transport.bye(runner_id)
 
-    async def _execute(self, context, scenario_id, scenario_data_id, journey_spec, args, delay=0):
-        logger.debug('Runner._execute starting scenario_id=%r scenario_data_id=%r journey_spec=%r args=%r delay=%r', scenario_id, scenario_data_id, journey_spec, args, delay)
-        await asyncio.sleep(delay)
-        self._inc_work(scenario_id)
+    async def _execute(self, context, scenario_id, scenario_data_id, journey_spec, args):
+        logger.debug('Runner._execute starting scenario_id=%r scenario_data_id=%r journey_spec=%r args=%r', scenario_id, scenario_data_id, journey_spec, args)
         try:
             journey = spec_import(journey_spec)
             if args is None:
@@ -159,6 +188,5 @@ class Runner:
         except Exception as e:
             context.log_error()
             await asyncio.sleep(1)
-        self._dec_work(scenario_id)
         return scenario_id, scenario_data_id
 
