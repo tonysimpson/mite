@@ -172,7 +172,9 @@ def collector(opts):
 
 def main():
     opts = docopt.docopt(__doc__)
-    logging.basicConfig(level=opts['--log-level'])
+    logging.basicConfig(
+        level=opts['--log-level'],
+        format='[%(asctime)s] <%(levelname)s> [%(name)s] [%(pathname)s:%(lineno)d %(funcName)s] %(message)s')
     if opts['scenario']:
         scenario_cmd(opts)
     elif opts['journey']:
