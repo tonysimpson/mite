@@ -1,5 +1,8 @@
 from collections import deque
 from acurl import EventLoop
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class _SessionPoolContextManager:
@@ -25,38 +28,39 @@ class SessionPool:
 
     def decorator(self, func):
         async def wrapper(ctx, *args, **kwargs):
-            with self.session_context(ctx):
+            async with self.session_context(ctx):
                 return await func(ctx, *args, **kwargs)
         return wrapper
 
     async def _checkout(self, context):
+        logger.debug('Session pool size %d', len(self._pool))
         if self._pool:
             session = self._pool.pop()
+            await session.erase_all_cookies()
+            logger.debug('Session from pool %r', session)
         else:
             session = self._el.session()
-            session._real_request = session.request
-        async def _wrapped_request(*args, **kwargs):
-            resp = await session._real_request(*args, **kwargs)
-            for r in resp.history + [resp]:
-                context.send('http_curl_metrics', 
-                    time=r.start_time, 
-                    effective_url=r.url, 
-                    response_code=r.status_code,
-                    dns_time=r.namelookup_time,
-                    connect_time=r.connect_time,
-                    tls_time=r.appconnect_time,
-                    transfer_start_time=r.pretransfer_time,
-                    first_byte_time=r.starttransfer_time,
-                    total_time=r.total_time,
-                    primary_ip=r.primary_ip,
-                    method=r.request.method
-                )
-            return resp
-        session.request = _wrapped_request
+            logger.debug('New session %r', session)
+        def response_callback(r):
+            context.send('http_curl_metrics', 
+                start_time=r.start_time, 
+                effective_url=r.url, 
+                response_code=r.status_code,
+                dns_time=r.namelookup_time,
+                connect_time=r.connect_time,
+                tls_time=r.appconnect_time,
+                transfer_start_time=r.pretransfer_time,
+                first_byte_time=r.starttransfer_time,
+                total_time=r.total_time,
+                primary_ip=r.primary_ip,
+                method=r.request.method
+            )
+        session.set_response_callback(response_callback)
         return session
 
     async def _checkin(self, session):
-        await session.erase_all_cookies()
+        logger.debug('return session %r', session)
+        session.set_response_callback(None)
         self._pool.append(session)
 
 
