@@ -82,7 +82,6 @@ class Controller:
         self._runner_tracker.update(runner_id)
         self._scenario_manager.checkin_data(completed_data_ids)
         work = self._required_work_for_runner(runner_id, max_work)
-        logger.debug('Controller.request_work returning runner_id=%s work=%r', runner_id, work)
         return work, self._config_manager.get_changes_for_runner(runner_id), not self._scenario_manager.is_active()
 
     def should_stop(self):

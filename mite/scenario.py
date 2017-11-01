@@ -50,13 +50,13 @@ class ScenarioManager:
             try:
                 number = int(scenario.volumemodel(start_of_period, end_of_period))
             except StopScenario:
-                logger.info('ScenarioManager.get_work Removed scenario %d due because volume model raised StopScenario', scenario_ids)
+                logger.info('ScenarioManager.get_work Removed scenario %d due because volume model raised StopScenario', scenario_id)
                 del self._scenarios[scenario_id]
             else:
                 required[scenario_id] = number
         self._current_period_end = end_of_period
         self._required = required
-        logger.debug('ScenarioManager._update_required_and_period period_end=%r required=%r', self._current_period_end, self._required)
+        #logger.debug('ScenarioManager._update_required_and_period period_end=%r required=%r', self._current_period_end, self._required)
 
     def get_required_work(self):
         if self._in_start:
@@ -81,12 +81,12 @@ class ScenarioManager:
             for k, v in diff.items():
                 for i in range(v):
                     yield k
-        logger.debug('ScenarioManager.get_work diff=%r num=%r', diff, num)
+        #logger.debug('ScenarioManager.get_work diff=%r num=%r', diff, num)
         scenario_ids = list(_yield(diff))
         random.shuffle(scenario_ids)
         work = []
         scenario_volume_map = {}
-        logger.debug('ScenarioManager.get_work scenario_ids=%r', scenario_ids)
+        #logger.debug('ScenarioManager.get_work scenario_ids=%r', scenario_ids)
         for scenario_id in scenario_ids:
             if len(work) >= num:
                 break
