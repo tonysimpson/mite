@@ -27,13 +27,15 @@ def _volume_dicts_remove_a_from_b(a, b):
 
 
 class ScenarioManager:
-    def __init__(self, start_delay=0, period=1):
+    def __init__(self, start_delay=0, period=1, min_period=0.01, spawn_rate=None):
         self._period = period
         self._scenario_id_gen = count(1)
         self._in_start = start_delay > 0
         self._start_delay = start_delay
         self._start_time = time.time()
         self._current_period_end = 0
+        self._min_period = min_period
+        self._spawn_rate = spawn_rate
         self._required = {}
         self._scenarios = {}
 
@@ -56,7 +58,6 @@ class ScenarioManager:
                 required[scenario_id] = number
         self._current_period_end = end_of_period
         self._required = required
-        #logger.debug('ScenarioManager._update_required_and_period period_end=%r required=%r', self._current_period_end, self._required)
 
     def get_required_work(self):
         if self._in_start:
@@ -77,16 +78,20 @@ class ScenarioManager:
         num = max(0, (total / num_runners) - num_runner_current_work)
         if max_num is not None:
             num = min(max_num, num)
+        if self._spawn_rate is not None:
+            spawn_now = self._spawn_rate / (num_runners / self._min_period)
+            i = int(spawn_now)
+            if (spawn_now % 1) > random.random():
+                i += 1
+            num = min(num, i)
         def _yield(diff):
             for k, v in diff.items():
                 for i in range(v):
                     yield k
-        #logger.debug('ScenarioManager.get_work diff=%r num=%r', diff, num)
         scenario_ids = list(_yield(diff))
         random.shuffle(scenario_ids)
         work = []
         scenario_volume_map = {}
-        #logger.debug('ScenarioManager.get_work scenario_ids=%r', scenario_ids)
         for scenario_id in scenario_ids:
             if len(work) >= num:
                 break

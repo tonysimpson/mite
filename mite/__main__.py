@@ -20,16 +20,21 @@ Examples:
     mite scenario test mite.example:scenario
 
 Options:
-    -h --help                       Show this screen.
+    -h --help                       Show this screen
     --version                       Show version
     --log-level=LEVEL               Set logger level, one of DEBUG, INFO, WARNING, ERROR, CRITICAL [default: INFO]
     --config=CONFIG_SPEC            Set a config loader to a callable loaded via a spec [default: mite.config:default_config_loader]
     --no-web                        Don't start the build in webserver
-    --web-address=HOST_POST         Web bind address [default: 127.0.0.1:9301]
+    --spawn-rate=NUM_PER_SECOND     Maximum spawn rate [default: 1000]
+    --max-loop-delay=SECONDS        Runner internal loop delay maximum [default: 1]
+    --min-loop-delay=SECONDS        Runner internal loop delay minimum [default: 0.01]
+    --runner-max-journeys=NUMBER    Max number of concurrent journeys a runner can run
     --controller-socket=SOCKET      Controller socket [default: tcp://127.0.0.1:14301]
     --message-socket=SOCKET         Message socket [default: tcp://127.0.0.1:14302]
     --delay-start-seconds=DELAY     Delay start allowing others to connect [default: 10]
     --volume=VOLUME                 Volume to run journey at [default: 1]
+    --web-address=HOST_POST         Web bind address [default: 127.0.0.1:9301]
+
 """
 import asyncio
 import docopt
@@ -104,15 +109,28 @@ def _create_config_manager(opts):
     return config_manager
 
 
+def _create_runner(opts, transport, msg_sender):
+    loop_wait_max = float(opts['--max-loop-delay'])
+    loop_wait_min = float(opts['--min-loop-delay'])
+    max_work = None
+    if opts['--runner-max-journeys']:
+        max_work = int(opts['--runner-max-journeys'])
+    return Runner(transport, msg_sender, loop_wait_min=loop_wait_min, loop_wait_max=loop_wait_max, max_work=max_work)
+
+
+def _create_scenario_manager(opts):
+    return ScenarioManager(start_delay=float(opts['--delay-start-seconds']), period=float(opts['--max-loop-delay']), min_period=float(opts['--min-loop-delay']), spawn_rate=int(opts['--spawn-rate']))
+
+
 def test_scenarios(test_name, opts, scenarios):
     _maybe_start_web_in_thread(opts)
-    scenario_manager = ScenarioManager()
+    scenario_manager = _create_scenario_manager(opts)
     for journey_spec, datapool, volumemodel in scenarios:
         scenario_manager.add_scenario(journey_spec, datapool, volumemodel)
     config_manager = _create_config_manager(opts)
     controller = Controller(test_name, scenario_manager, config_manager)
     transport = DirectRunnerTransport(controller)
-    asyncio.get_event_loop().run_until_complete(Runner(transport, _msg_handler).run())
+    asyncio.get_event_loop().run_until_complete(_create_runner(opts, transport, _msg_handler).run())
 
 
 def scenario_test_cmd(opts):
@@ -145,7 +163,7 @@ def journey_cmd(opts):
 def controller(opts):
     scenario_spec = opts['SCENARIO_SPEC']
     scenarios = spec_import(scenario_spec)()
-    scenario_manager = ScenarioManager(start_delay=float(opts['--delay-start-seconds']))
+    scenario_manager = _create_scenario_manager(opts)
     for journey_spec, datapool, volumemodel in scenarios:
         scenario_manager.add_scenario(journey_spec, datapool, volumemodel)
     config_manager = _create_config_manager(opts)
@@ -157,7 +175,7 @@ def controller(opts):
 def runner(opts):
     transport = NanomsgRunnerTransport(opts['--controller-socket'])
     sender = NanomsgSender(opts['--message-socket'])
-    asyncio.get_event_loop().run_until_complete(Runner(transport, sender.send).run())
+    asyncio.get_event_loop().run_until_complete(_create_runner(opts, transport, sender.send).run())
 
 
 def collector(opts):
