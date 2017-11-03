@@ -2,9 +2,9 @@
 Mite Load Test Framewwork.
 
 Usage:
-    mite [options] scenario test SCENARIO_SPEC
+    mite [options] scenario test SCENARIO_SPEC [--config=CONFIG_SPEC]
     mite [options] journey test JOURNEY_SPEC [DATAPOOL_SPEC] [--volume=VOLUME]
-    mite controller SCENARIO_SPEC [--controller-socket=SOCKET] [--message-socket=SOCKET] [--delay-start-seconds=DELAY]
+    mite controller SCENARIO_SPEC [--config=CONFIG_SPEC] [--controller-socket=SOCKET] [--message-socket=SOCKET] [--delay-start-seconds=DELAY]
     mite runner [--controller-socket=SOCKET] [--message-socket=SOCKET]
     mite collector [--message-socket=SOCKET] [--web-address=HOST_POST] [--no-web]
     mite --help
@@ -14,7 +14,7 @@ Arguments:
     SCENARIO_SPEC           Identifier for a scenario in the form package_path:callable_name
     CONFIG_SPEC             Identifier for config callable returning dict of config
     JOURNEY_SPEC            Identifier for journey async callable
-    VOLUME_MODEUL_SPEC      Identifier for volume model callable
+    VOLUME_MODEL_SPEC       Identifier for volume model callable
 
 Examples:
     mite scenario test mite.example:scenario
