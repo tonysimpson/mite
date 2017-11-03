@@ -65,16 +65,16 @@ class DirectRunnerTransport:
         return self._controller.bye(runner_id)
 
 
+msg_logger = logging.getLogger('MSG')
 def _msg_handler(msg):
     metrics_processor.process_message(msg)
     if 'type' in msg and msg['type'] == 'data_created':
         open(msg['name'] + '.msgpack', 'ab').write(pack_msg(msg['data']))
     start = "[%s] %.6f" % (msg.pop('type', None), msg.pop('time', None))
     end = ', '.join("%s=%r" % (k, v) for k, v in msg.items() if k != 'stacktrace')
-    print(start, end)
+    msg_logger.info("%s %s", start, end)
     if 'stacktrace' in msg:
-        print("ERROR:")
-        print(msg['stacktrace'])
+        msg_logger.warning(msg['stacktrace'])
 
 
 def _maybe_start_web_in_thread(opts):
