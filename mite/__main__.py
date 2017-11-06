@@ -2,11 +2,11 @@
 Mite Load Test Framewwork.
 
 Usage:
-    mite [options] scenario test SCENARIO_SPEC [--config=CONFIG_SPEC]
-    mite [options] journey test JOURNEY_SPEC [DATAPOOL_SPEC] [--volume=VOLUME]
-    mite controller SCENARIO_SPEC [--config=CONFIG_SPEC] [--controller-socket=SOCKET] [--message-socket=SOCKET] [--delay-start-seconds=DELAY]
-    mite runner [--controller-socket=SOCKET] [--message-socket=SOCKET]
-    mite collector [--message-socket=SOCKET] [--web-address=HOST_POST] [--no-web]
+    mite [options] scenario test SCENARIO_SPEC
+    mite [options] journey test JOURNEY_SPEC [DATAPOOL_SPEC]
+    mite [options] controller SCENARIO_SPEC
+    mite [options] runner
+    mite [options] collector
     mite --help
     mite --version
 
