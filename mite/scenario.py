@@ -52,7 +52,7 @@ class ScenarioManager:
             try:
                 number = int(scenario.volumemodel(start_of_period, end_of_period))
             except StopScenario:
-                logger.info('ScenarioManager.get_work Removed scenario %d due because volume model raised StopScenario', scenario_id)
+                logger.info('Removed scenario %d because volume model raised StopScenario', scenario_id)
                 del self._scenarios[scenario_id]
             else:
                 required[scenario_id] = number
@@ -71,19 +71,21 @@ class ScenarioManager:
             self._update_required_and_period(self._current_period_end, int(now + self._period))
         return self._required
 
-    def get_work(self, current_work, num_runner_current_work , num_runners, max_num=None):
+    def get_work(self, current_work, num_runner_current_work , num_runners, runner_self_limit=None):
         required = self.get_required_work()
         diff = _volume_dicts_remove_a_from_b(current_work, required)
         total = sum(required.values())
-        num = max(0, (total / num_runners) - num_runner_current_work)
-        if max_num is not None:
-            num = min(max_num, num)
+        runners_share_limit = max(0, int(((total / num_runners) - num_runner_current_work) + 0.5)) 
+        limit = runners_share_limit
+        if runner_self_limit is not None:
+            limit = min(runner_self_limit, runners_share_limit)
+        spawn_limit = None
         if self._spawn_rate is not None:
-            spawn_now = self._spawn_rate / (num_runners / self._min_period)
-            i = int(spawn_now)
-            if (spawn_now % 1) > random.random():
-                i += 1
-            num = min(num, i)
+            spawn_limit_f = self._spawn_rate / (num_runners / self._min_period)
+            spawn_limit = int(spawn_limit_f)
+            if (spawn_limit_f % 1) > random.random():
+                spawn_limit += 1
+            limit = min(limit, spawn_limit)
         def _yield(diff):
             for k, v in diff.items():
                 for i in range(v):
@@ -93,7 +95,7 @@ class ScenarioManager:
         work = []
         scenario_volume_map = {}
         for scenario_id in scenario_ids:
-            if len(work) >= num:
+            if len(work) >= limit:
                 break
             if scenario_id in self._scenarios:
                 scenario = self._scenarios[scenario_id]
@@ -103,7 +105,7 @@ class ScenarioManager:
                     try:
                         dpi = scenario.datapool.checkout()
                     except DataPoolExhausted:
-                        logger.info('ScenarioManager.get_work Removed scenario %d because data pool exhausted', scenario_ids)
+                        logger.info('Removed scenario %d because data pool exhausted', scenario_ids)
                         del self._scenarios[scenario_id]
                         continue
                     else:
@@ -114,6 +116,8 @@ class ScenarioManager:
                     scenario_volume_map[scenario_id] += 1
                 else:
                     scenario_volume_map[scenario_id] = 1
+        logger.debug('current=%r required=%r diff=%r limit=%r runners_share_limit=%r spawn_limit=%r runner_self_limit=%r num_runners=%r spawn_rate=%r min_period=%r num_runner_current_work=%r len_work=%r', 
+                     sum(current_work.values()), sum(required.values()), sum(diff.values()), limit, runners_share_limit, spawn_limit, runner_self_limit, num_runners, self._spawn_rate, self._min_period, num_runner_current_work, len(work))
         return work, scenario_volume_map
 
     def is_active(self):

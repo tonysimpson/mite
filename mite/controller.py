@@ -12,7 +12,6 @@ class WorkTracker:
 
     def set_actual(self, runner_id, work):
         self._all_work[runner_id] = defaultdict(int, work)
-        logger.debug("WorkTracker.set_actual runner_id=%r actual=%r" % (runner_id, work))
 
     def add_assumed(self, runner_id, work):
         current = self._all_work[runner_id]
@@ -57,7 +56,7 @@ class Controller:
         self._work_tracker = WorkTracker()
         self._runner_tracker = RunnerTracker()
         self._config_manager = config_manager
-    
+
     def hello(self):
         runner_id = next(self._runner_id_gen)
         return runner_id, self._testname, self._config_manager.get_changes_for_runner(runner_id)
