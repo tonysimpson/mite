@@ -57,7 +57,6 @@ class Controller:
         self._work_tracker = WorkTracker()
         self._runner_tracker = RunnerTracker()
         self._config_manager = config_manager
-        self._start_time = time.time()
     
     def hello(self):
         runner_id = next(self._runner_id_gen)
@@ -85,7 +84,7 @@ class Controller:
         return work, self._config_manager.get_changes_for_runner(runner_id), not self._scenario_manager.is_active()
 
     def should_stop(self):
-        return (not self._scenario_manager.is_active()) and self._work_tracker.get_active_count() == 0
+        return (not self._scenario_manager.is_active()) and self._run_tracker.get_active_count() == 0
 
     def bye(self, runner_id):
         self._runner_tracker.remove_runner(runner_id)
