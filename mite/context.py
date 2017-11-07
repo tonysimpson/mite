@@ -2,18 +2,24 @@ import importlib
 import time
 import traceback
 from unittest.mock import MagicMock
+from .exceptions import MiteError, HandledMiteError
+
 
 
 class _TransactionContextManager:
-    def __init__(self, user_session, name):
-        self._user_session = user_session
+    def __init__(self, ctx, name):
+        self._ctx = ctx
         self._name = name
 
     def __enter__(self):
-        self._user_session._start_transaction(self._name)
+        self._ctx._start_transaction(self._name)
 
-    def __exit__(self, *args):
-        self._user_session._end_transaction()
+    def __exit__(self, exception_type, exception_val, traceback):
+        if isinstance(exception_val, MiteError):
+            self._ctx.send('error', message=str(exception_val), **exception_val.fields)
+            self._ctx._end_transaction()
+            raise HandledMiteError()
+        self._ctx._end_transaction()
 
 
 class Context:

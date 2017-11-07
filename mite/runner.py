@@ -7,7 +7,7 @@ import logging
 
 from .context import Context
 from .utils import spec_import
-from . import MiteError
+from .exceptions import HandledMiteError
 
 logger = logging.getLogger(__name__)
 
@@ -183,8 +183,8 @@ class Runner:
                 await journey(context)
             else:
                 await journey(context, *args)
-        except MiteError as me:
-            context.send('error', message=str(me), **me.fields)
+        except HandledMiteError as hme:
+            pass
         except Exception as e:
             context.log_error()
             await asyncio.sleep(1)

@@ -71,7 +71,7 @@ def _msg_handler(msg):
     if 'type' in msg and msg['type'] == 'data_created':
         open(msg['name'] + '.msgpack', 'ab').write(pack_msg(msg['data']))
     start = "[%s] %.6f" % (msg.pop('type', None), msg.pop('time', None))
-    end = ', '.join("%s=%r" % (k, v) for k, v in msg.items() if k != 'stacktrace')
+    end = ', '.join("%s=%r" % (k, v) for k, v in sorted(msg.items()) if k != 'stacktrace')
     msg_logger.info("%s %s", start, end)
     if 'stacktrace' in msg:
         msg_logger.warning(msg['stacktrace'])
