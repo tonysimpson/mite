@@ -22,6 +22,7 @@ Examples:
 Options:
     -h --help                       Show this screen
     --version                       Show version
+    --ipdb                           Drop into IPDB on journey error
     --log-level=LEVEL               Set logger level, one of DEBUG, INFO, WARNING, ERROR, CRITICAL [default: INFO]
     --config=CONFIG_SPEC            Set a config loader to a callable loaded via a spec [default: mite.config:default_config_loader]
     --no-web                        Don't start the build in webserver
@@ -115,7 +116,7 @@ def _create_runner(opts, transport, msg_sender):
     max_work = None
     if opts['--runner-max-journeys']:
         max_work = int(opts['--runner-max-journeys'])
-    return Runner(transport, msg_sender, loop_wait_min=loop_wait_min, loop_wait_max=loop_wait_max, max_work=max_work)
+    return Runner(transport, msg_sender, loop_wait_min=loop_wait_min, loop_wait_max=loop_wait_max, max_work=max_work, debug=opts['--ipdb'])
 
 
 def _create_scenario_manager(opts):
