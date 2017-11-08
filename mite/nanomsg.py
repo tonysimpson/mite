@@ -37,8 +37,11 @@ class NanomsgReciever:
         return self._sock.recv()
 
     async def run(self, stop_func=None):
+        return await self._loop.run_in_executor(None, self._run, stop_func)
+
+    def _run(self, stop_func=None):
         while stop_func is None or not stop_func():
-            raw = await self._loop.run_in_executor(None, self._recv)
+            raw = self._recv()
             for raw_listener in self._raw_listeners:
                 raw_listener(raw)
             msg = unpack_msg(raw)

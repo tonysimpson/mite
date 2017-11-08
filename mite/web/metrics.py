@@ -1,4 +1,5 @@
 from collections import namedtuple
+import time
 
 
 class KeyedMetricsCounter:
@@ -71,10 +72,13 @@ class MetricsProcessor:
         self._response_counter = KeyedMetricsCounter()
         self._response_histogram = KeyedHistogram([0.00001, 0.0001, 0.001,
             0.01, 0.05, 0.1, 0.15, 0.2, 0.4, 0.6, 0.8, 1, 2, 4, 8, 16])
+        self._msg_delay = 0
 
     def process_message(self, msg):
         if 'type' not in msg:
             return
+        if 'time' in msg:
+            self._msg_delay = time.time() - msg['time']
         msg_type = msg['type']
         if msg_type == 'http_curl_metrics':
             key = _response_key(
@@ -113,7 +117,8 @@ class MetricsProcessor:
         def format_dict(d):
             return ','.join(['%s="%s"' % (k,v) for k,v in d.items()])
         lines = []
-        lines.append('# TYPE mite_http_response_total counter')
+        lines.append('# TYPE mite_message_delay gauge')
+        lines.append('mite_message_delay {} %s' % (self._msg_delay,))
         for key, value in self._response_counter.iter_counts():
             lines.append('mite_http_response_total {%s} %s' % (format_dict(key._asdict()), value))
         lines.append('')
