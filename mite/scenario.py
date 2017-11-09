@@ -71,7 +71,7 @@ class ScenarioManager:
             self._update_required_and_period(self._current_period_end, int(now + self._period))
         return self._required
 
-    def get_work(self, current_work, num_runner_current_work , num_runners, runner_self_limit=None):
+    def get_work(self, current_work, num_runner_current_work , num_runners, runner_self_limit, hit_rate):
         required = self.get_required_work()
         diff = _volume_dicts_remove_a_from_b(current_work, required)
         total = sum(required.values())
@@ -80,8 +80,8 @@ class ScenarioManager:
         if runner_self_limit is not None:
             limit = min(runner_self_limit, runners_share_limit)
         spawn_limit = None
-        if self._spawn_rate is not None:
-            spawn_limit_f = self._spawn_rate / (num_runners / self._min_period)
+        if self._spawn_rate is not None and hit_rate > 1:
+            spawn_limit_f = self._spawn_rate / hit_rate
             spawn_limit = int(spawn_limit_f)
             if (spawn_limit_f % 1) > random.random():
                 spawn_limit += 1
@@ -116,8 +116,8 @@ class ScenarioManager:
                     scenario_volume_map[scenario_id] += 1
                 else:
                     scenario_volume_map[scenario_id] = 1
-        logger.debug('current=%r required=%r diff=%r limit=%r runners_share_limit=%r spawn_limit=%r runner_self_limit=%r num_runners=%r spawn_rate=%r min_period=%r num_runner_current_work=%r len_work=%r', 
-                     sum(current_work.values()), sum(required.values()), sum(diff.values()), limit, runners_share_limit, spawn_limit, runner_self_limit, num_runners, self._spawn_rate, self._min_period, num_runner_current_work, len(work))
+        logger.debug('current=%r required=%r diff=%r limit=%r runners_share_limit=%r spawn_limit=%r runner_self_limit=%r num_runners=%r spawn_rate=%r hit_rate=%r min_period=%r num_runner_current_work=%r len_work=%r', 
+                     sum(current_work.values()), sum(required.values()), sum(diff.values()), limit, runners_share_limit, spawn_limit, runner_self_limit, num_runners, self._spawn_rate, hit_rate, self._min_period, num_runner_current_work, len(work))
         return work, scenario_volume_map
 
     def is_active(self):

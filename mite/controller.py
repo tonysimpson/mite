@@ -1,4 +1,4 @@
-from collections import defaultdict
+from collections import defaultdict, deque
 from itertools import count
 import time
 import logging
@@ -34,11 +34,22 @@ class WorkTracker:
 
 class RunnerTracker:
     def __init__(self, timeout=10):
+        self._hits = deque()
         self._last_seen = {}
         self._timeout = timeout
 
     def update(self, runner_id):
-        self._last_seen[runner_id] = time.time()
+        t = time.time()
+        self._last_seen[runner_id] = t
+        self._hits.append(t)
+        if self._hits[0] < t - self._timeout:
+            self._hits.popleft()
+
+    def get_hit_rate(self):
+        t = time.time()
+        while self._hits and self._hits[0] <  t - self._timeout:
+            self._hits.popleft()
+        return len(self._hits) / self._timeout
 
     def remove_runner(self, runner_id):
         del self._last_seen[runner_id]
@@ -71,7 +82,8 @@ class Controller:
         runner_total = self._work_tracker.get_runner_total(runner_id)
         active_runners = self._runner_tracker.get_active_count()
         current_work = self._work_tracker.get_total_work()
-        work, scenario_volume_map = self._scenario_manager.get_work(current_work, runner_total, active_runners, max_work)
+        hit_rate = self._runner_tracker.get_hit_rate()
+        work, scenario_volume_map = self._scenario_manager.get_work(current_work, runner_total, active_runners, max_work, hit_rate)
         self._add_assumed(runner_id, scenario_volume_map) 
         return work
 
@@ -83,7 +95,7 @@ class Controller:
         return work, self._config_manager.get_changes_for_runner(runner_id), not self._scenario_manager.is_active()
 
     def should_stop(self):
-        return (not self._scenario_manager.is_active()) and self._run_tracker.get_active_count() == 0
+        return (not self._scenario_manager.is_active()) and self._runner_tracker.get_active_count() == 0
 
     def bye(self, runner_id):
         self._runner_tracker.remove_runner(runner_id)
