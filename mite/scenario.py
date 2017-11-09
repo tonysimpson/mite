@@ -75,7 +75,11 @@ class ScenarioManager:
         required = self.get_required_work()
         diff = _volume_dicts_remove_a_from_b(current_work, required)
         total = sum(required.values())
-        runners_share_limit = max(0, int(((total / num_runners) - num_runner_current_work) + 0.5)) 
+        if num_runners > 1:
+            work_share = total / num_runners
+        else:
+            work_share=total
+        runners_share_limit = max(0, int((work_share - num_runner_current_work) + 0.5))
         limit = runners_share_limit
         if runner_self_limit is not None:
             limit = min(runner_self_limit, runners_share_limit)
