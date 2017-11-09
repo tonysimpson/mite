@@ -7,9 +7,10 @@ from .exceptions import MiteError, HandledMiteError
 
 
 class _TransactionContextManager:
-    def __init__(self, ctx, name):
+    def __init__(self, ctx, name, debug):
         self._ctx = ctx
         self._name = name
+        self._debug = debug
 
     def __enter__(self):
         self._ctx._start_transaction(self._name)
@@ -18,12 +19,15 @@ class _TransactionContextManager:
         if isinstance(exception_val, MiteError):
             self._ctx.send('error', message=str(exception_val), **exception_val.fields)
             self._ctx._end_transaction()
+            if self._debug:
+                import ipdb
+                ipdb.post_mortem(traceback)
             raise HandledMiteError()
         self._ctx._end_transaction()
 
 
 class Context:
-    def __init__(self, send, config, id_data=None, should_stop_func=None):
+    def __init__(self, send, config, id_data=None, should_stop_func=None, debug=False):
         self._send = send
         self._config = config
         if id_data is None:
@@ -31,6 +35,7 @@ class Context:
         self._id_data = id_data
         self._should_stop_func = should_stop_func
         self._transaction_names = []
+        self._debug = debug
 
     @property
     def config(self):
@@ -89,5 +94,5 @@ class Context:
         self._error(traceback.format_exc())
 
     def transaction(self, name):
-        return _TransactionContextManager(self, name)
+        return _TransactionContextManager(self, name, self._debug)
 

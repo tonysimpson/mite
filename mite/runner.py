@@ -75,7 +75,7 @@ class RunnerConfig:
 
 
 class Runner:
-    def __init__(self, transport, msg_sender, loop_wait_min=0.01, loop_wait_max=0.5, max_work=None, loop=None):
+    def __init__(self, transport, msg_sender, loop_wait_min=0.01, loop_wait_max=0.5, max_work=None, loop=None, debug=False):
         self._transport = transport
         self._msg_sender = msg_sender
         self._work = {}
@@ -87,6 +87,7 @@ class Runner:
         if loop is None:
             loop = asyncio.get_event_loop()
         self._loop = loop
+        self._debug = debug
 
     def _inc_work(self, id):
         if id in self._work:
@@ -163,7 +164,7 @@ class Runner:
                     'scenario_id': scenario_id,
                     'scenario_data_id': scenario_data_id
                 }
-                context = Context(self._msg_sender, config, id_data=id_data, should_stop_func=self.should_stop)
+                context = Context(self._msg_sender, config, id_data=id_data, should_stop_func=self.should_stop, debug=self._debug)
                 self._inc_work(scenario_id)
                 future = asyncio.ensure_future(self._execute(context, scenario_id, scenario_data_id, journey_spec, args))
                 running.append(future)
@@ -187,6 +188,9 @@ class Runner:
             pass
         except Exception as e:
             context.log_error()
+            if self._debug:
+                import ipdb
+                ipdb.post_mortem()
             await asyncio.sleep(1)
         return scenario_id, scenario_data_id
 
