@@ -22,24 +22,28 @@ Examples:
 Options:
     -h --help                       Show this screen
     --version                       Show version
-    --ipdb                           Drop into IPDB on journey error
+    --debugging                     Drop into IPDB on journey error
     --log-level=LEVEL               Set logger level, one of DEBUG, INFO, WARNING, ERROR, CRITICAL [default: INFO]
     --config=CONFIG_SPEC            Set a config loader to a callable loaded via a spec [default: mite.config:default_config_loader]
     --no-web                        Don't start the build in webserver
     --spawn-rate=NUM_PER_SECOND     Maximum spawn rate [default: 1000]
     --max-loop-delay=SECONDS        Runner internal loop delay maximum [default: 1]
-    --min-loop-delay=SECONDS        Runner internal loop delay minimum [default: 0.01]
+    --min-loop-delay=SECONDS        Runner internal loop delay minimum [default: 0]
     --runner-max-journeys=NUMBER    Max number of concurrent journeys a runner can run
     --controller-socket=SOCKET      Controller socket [default: tcp://127.0.0.1:14301]
     --message-socket=SOCKET         Message socket [default: tcp://127.0.0.1:14302]
-    --delay-start-seconds=DELAY     Delay start allowing others to connect [default: 10]
+    --delay-start-seconds=DELAY     Delay start allowing others to connect [default: 0]
     --volume=VOLUME                 Volume to run journey at [default: 1]
     --web-address=HOST_POST         Web bind address [default: 127.0.0.1:9301]
+    --exclude-working-directory     By default mite puts the current directory on the python path.
 
 """
+import sys
+import os
 import asyncio
 import docopt
 import threading
+import logging
 
 from .scenario import ScenarioManager
 from .config import ConfigManager
@@ -49,7 +53,6 @@ from .collector import Collector
 from .utils import spec_import, pack_msg
 from .web import app, metrics_processor
 from .nanomsg import NanomsgSender, NanomsgReciever, NanomsgRunnerTransport, NanomsgControllerServer
-import logging
 
 
 class DirectRunnerTransport:
@@ -116,11 +119,11 @@ def _create_runner(opts, transport, msg_sender):
     max_work = None
     if opts['--runner-max-journeys']:
         max_work = int(opts['--runner-max-journeys'])
-    return Runner(transport, msg_sender, loop_wait_min=loop_wait_min, loop_wait_max=loop_wait_max, max_work=max_work, debug=opts['--ipdb'])
+    return Runner(transport, msg_sender, loop_wait_min=loop_wait_min, loop_wait_max=loop_wait_max, max_work=max_work, debug=opts['--debugging'])
 
 
 def _create_scenario_manager(opts):
-    return ScenarioManager(start_delay=float(opts['--delay-start-seconds']), period=float(opts['--max-loop-delay']), min_period=float(opts['--min-loop-delay']), spawn_rate=int(opts['--spawn-rate']))
+    return ScenarioManager(start_delay=float(opts['--delay-start-seconds']), period=float(opts['--max-loop-delay']), spawn_rate=int(opts['--spawn-rate']))
 
 
 def test_scenarios(test_name, opts, scenarios):
@@ -189,11 +192,21 @@ def collector(opts):
     asyncio.get_event_loop().run_until_complete(reciever.run())
 
 
-def main():
-    opts = docopt.docopt(__doc__)
+def setup_logging(opts):
     logging.basicConfig(
         level=opts['--log-level'],
         format='[%(asctime)s] <%(levelname)s> [%(name)s] [%(pathname)s:%(lineno)d %(funcName)s] %(message)s')
+
+
+def configure_python_path(opts):
+    if not opts['--exclude-working-directory']:
+        sys.path.insert(0, os.getcwd()) 
+
+
+def main():
+    opts = docopt.docopt(__doc__)
+    setup_logging(opts)
+    configure_python_path(opts)
     if opts['scenario']:
         scenario_cmd(opts)
     elif opts['journey']:

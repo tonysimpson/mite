@@ -1,29 +1,67 @@
-import importlib
+import asyncio
 import time
 import traceback
-from unittest.mock import MagicMock
-from .exceptions import MiteError, HandledMiteError
+import warnings
 
+from .exceptions import MiteError
+
+class HandledException(BaseException):
+    def __init__(self, original_exception, original_tb):
+        self.original_exception = original_exception
+        self.original_tb = original_tb
+
+
+class HandledMiteError(HandledException):
+    pass
+
+
+def drop_to_debugger(traceback):
+    try:
+        import ipdb as pdb
+    except ImportError:
+        warnings.warn('ipdb not available, falling back to pdb')
+        import pdb
+    pdb.post_mortem(traceback)
 
 
 class _TransactionContextManager:
-    def __init__(self, ctx, name, debug):
+    def __init__(self, ctx, name):
         self._ctx = ctx
         self._name = name
-        self._debug = debug
 
-    def __enter__(self):
+    async def __aenter__(self):
         self._ctx._start_transaction(self._name)
 
-    def __exit__(self, exception_type, exception_val, traceback):
-        if isinstance(exception_val, MiteError):
-            self._ctx.send('error', message=str(exception_val), **exception_val.fields)
+    async def __aexit__(self, exception_type, exception_val, traceback):
+        try:
+            if exception_val and not isinstance(exception_val, HandledException):
+                if self._ctx._debug:
+                    drop_to_debugger(traceback)
+                if isinstance(exception_val, MiteError):
+                    self._ctx._send_mite_error(exception_val, traceback)
+                    raise HandledMiteError(exception_val, traceback)
+                else:
+                    self._ctx._send_exception(exception_val, traceback)
+                    raise HandledException(exception_val, traceback)
+        finally:
             self._ctx._end_transaction()
-            if self._debug:
-                import ipdb
-                ipdb.post_mortem(traceback)
-            raise HandledMiteError()
-        self._ctx._end_transaction()
+
+
+class _ExceptionHandlerContextManager:
+    def __init__(self, ctx):
+        self._ctx = ctx
+
+    async def __aenter__(self):
+        pass
+
+    async def __aexit__(self, exception_type, exception_val, traceback):
+        if exception_val and not isinstance(exception_val, HandledMiteError):
+            if not isinstance(exception_val, HandledException):
+                if self._ctx._debug:
+                    drop_to_debugger(traceback)
+                self._ctx._send_exception(exception_val, traceback)
+            await asyncio.sleep(1)
+        return True
 
 
 class Context:
@@ -47,6 +85,15 @@ class Context:
             return self._should_stop_func()
         return False
 
+    def send(self, type, **content):
+        msg = content
+        msg['type'] = type
+        self._add_context_headers_and_time(msg)
+        self._send(msg)
+
+    def transaction(self, name):
+        return _TransactionContextManager(self, name)
+
     @property
     def _transaction_name(self):
         if self._transaction_names:
@@ -62,13 +109,25 @@ class Context:
         self._add_context_headers(msg)
         msg['time'] = time.time()
 
-    def _error(self, stacktrace):
-        msg = {
-            'stacktrace': stacktrace,
-            'type': 'exception'
-        }
-        self._add_context_headers_and_time(msg)
-        self._send(msg)
+    def _extract_filename_lineno_funcname(self, tb):
+        while tb.tb_next:
+            tb = tb.tb_next
+        f_code = tb.tb_frame.f_code
+        return f_code.co_filename, tb.tb_lineno, f_code.co_name
+
+    def _tb_format_location(self, tb):
+        return '{}:{}:{}'.format(*self._extract_filename_lineno_funcname(tb))
+
+    def _send_exception(self, value, tb):
+        message = str(value)
+        ex_type = type(value).__name__
+        location = self._tb_format_location(tb)
+        stacktrace = traceback.format_tb(tb)
+        self.send('exception', message=message, ex_type=ex_type, location=location, stacktrace=stacktrace)
+
+    def _send_mite_error(self, value, tb):
+        location = self._tb_format_location(tb)
+        self.send('error', message=str(value), location=location, **value.fields)
 
     def _start_transaction(self, name):
         msg = {}
@@ -84,15 +143,6 @@ class Context:
         self._send(msg)
         name = self._transaction_names.pop()
 
-    def send(self, type, **content):
-        msg = content
-        msg['type'] = type
-        self._add_context_headers_and_time(msg)
-        self._send(msg)
-
-    def log_error(self):
-        self._error(traceback.format_exc())
-
-    def transaction(self, name):
-        return _TransactionContextManager(self, name, self._debug)
+    def _exception_handler(self):
+        return _ExceptionHandlerContextManager(self)
 

@@ -7,7 +7,6 @@ import logging
 
 from .context import Context
 from .utils import spec_import
-from .exceptions import HandledMiteError
 
 logger = logging.getLogger(__name__)
 
@@ -178,19 +177,12 @@ class Runner:
 
     async def _execute(self, context, scenario_id, scenario_data_id, journey_spec, args):
         logger.debug('Runner._execute starting scenario_id=%r scenario_data_id=%r journey_spec=%r args=%r', scenario_id, scenario_data_id, journey_spec, args)
-        try:
-            journey = spec_import(journey_spec)
-            if args is None:
-                await journey(context)
-            else:
-                await journey(context, *args)
-        except HandledMiteError as hme:
-            pass
-        except Exception as e:
-            context.log_error()
-            if self._debug:
-                import ipdb
-                ipdb.post_mortem()
-            await asyncio.sleep(1)
+        async with context._exception_handler():
+            async with context.transaction('__root__'):
+                journey = spec_import(journey_spec)
+                if args is None:
+                    await journey(context)
+                else:
+                    await journey(context, *args)
         return scenario_id, scenario_data_id
 
