@@ -70,3 +70,5 @@ def get_session_pool():
     return get_session_pool._session_pool
 
 
+def mite_http(func):
+    return get_session_pool().decorator(func)

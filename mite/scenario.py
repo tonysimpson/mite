@@ -27,14 +27,13 @@ def _volume_dicts_remove_a_from_b(a, b):
 
 
 class ScenarioManager:
-    def __init__(self, start_delay=0, period=1, min_period=0.01, spawn_rate=None):
+    def __init__(self, start_delay=0, period=1, spawn_rate=None):
         self._period = period
         self._scenario_id_gen = count(1)
         self._in_start = start_delay > 0
         self._start_delay = start_delay
         self._start_time = time.time()
         self._current_period_end = 0
-        self._min_period = min_period
         self._spawn_rate = spawn_rate
         self._required = {}
         self._scenarios = {}
@@ -120,8 +119,8 @@ class ScenarioManager:
                     scenario_volume_map[scenario_id] += 1
                 else:
                     scenario_volume_map[scenario_id] = 1
-        logger.debug('current=%r required=%r diff=%r limit=%r runners_share_limit=%r spawn_limit=%r runner_self_limit=%r num_runners=%r spawn_rate=%r hit_rate=%r min_period=%r num_runner_current_work=%r len_work=%r', 
-                     sum(current_work.values()), sum(required.values()), sum(diff.values()), limit, runners_share_limit, spawn_limit, runner_self_limit, num_runners, self._spawn_rate, hit_rate, self._min_period, num_runner_current_work, len(work))
+        logger.debug('current=%r required=%r diff=%r limit=%r runners_share_limit=%r spawn_limit=%r runner_self_limit=%r num_runners=%r spawn_rate=%r hit_rate=%r num_runner_current_work=%r len_work=%r', 
+                     sum(current_work.values()), sum(required.values()), sum(diff.values()), limit, runners_share_limit, spawn_limit, runner_self_limit, num_runners, self._spawn_rate, hit_rate, num_runner_current_work, len(work))
         return work, scenario_volume_map
 
     def is_active(self):

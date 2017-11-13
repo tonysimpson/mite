@@ -5,7 +5,3 @@ class MiteError(Exception):
         super().__init__(message)
         self.fields = fields
 
-
-class HandledMiteError(BaseException):
-    pass
-
