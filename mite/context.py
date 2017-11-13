@@ -110,8 +110,6 @@ class Context:
         msg['time'] = time.time()
 
     def _extract_filename_lineno_funcname(self, tb):
-        while tb.tb_next:
-            tb = tb.tb_next
         f_code = tb.tb_frame.f_code
         return f_code.co_filename, tb.tb_lineno, f_code.co_name
 

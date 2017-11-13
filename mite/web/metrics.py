@@ -94,6 +94,7 @@ class MetricsProcessor:
         elif msg_type == 'exception' or msg_type == 'error':
             key = _error_key(
                 msg.get('test', ''),
+                msg.get('message', ''),
                 msg.get('journey', ''),
                 msg.get('transaction', ''),
                 msg.get('location', '')
