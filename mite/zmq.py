@@ -1,4 +1,4 @@
-import pyzmq
+import zmq
 
 from .utils import pack_msg, unpack_msg
 import asyncio
@@ -9,8 +9,8 @@ logger = logging.getLogger(__name__)
 
 class ZMQSender:
     def __init__(self, socket_address):
-        self._zmq_context = pyzmq.Context()
-        self._sock = self._zmq_context.socket(pyzmq.REQ)
+        self._zmq_context = zmq.Context()
+        self._sock = self._zmq_context.socket(zmq.REQ)
         self._sock.connect(socket_address)
 
     def send(self, msg):
@@ -19,8 +19,8 @@ class ZMQSender:
 
 class ZMQReceiver:
     def __init__(self, socket_address, listeners=None, raw_listeners=None, loop=None):
-        self._zmq_context = pyzmq.Context()
-        self._sock = self._zmq_context.socket(pyzmq.REP)
+        self._zmq_context = zmq.Context()
+        self._sock = self._zmq_context.socket(zmq.REP)
         self._sock.bind(socket_address)
         if listeners is None:
             listeners = []
@@ -61,8 +61,8 @@ _MSG_TYPE_BYE = 3
 
 class ZMQRunnerTransport:
     def __init__(self, socket_address, loop=None):
-        self._zmq_context = pyzmq.Context()
-        self._sock = self._zmq_context.socket(pyzmq.REQ)
+        self._zmq_context = zmq.Context()
+        self._sock = self._zmq_context.socket(zmq.REQ)
         self._sock.connect(socket_address)
         if loop is None:
             loop = asyncio.get_event_loop()
@@ -96,8 +96,8 @@ class ZMQRunnerTransport:
 
 class ZMQControllerServer:
     def __init__(self, socket_address):
-        self._zmq_context = pyzmq.Context()
-        self._sock = self._zmq_context.socket(pyzmq.REP)
+        self._zmq_context = zmq.Context()
+        self._sock = self._zmq_context.socket(zmq.REP)
         self._sock.bind(socket_address)
 
     async def run(self, controller, stop_func=None):
