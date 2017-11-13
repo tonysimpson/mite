@@ -84,7 +84,7 @@ class MetricsProcessor:
             key = _response_key(
                 msg.get('test', ''),
                 msg.get('journey', ''),
-                msg.get('transation', ''),
+                msg.get('transaction', ''),
                 msg['method'],
                 msg['response_code']
             )
@@ -94,21 +94,21 @@ class MetricsProcessor:
             key = _journey_key(
                 msg.get('test', ''),
                 msg.get('journey', ''),
-                msg.get('transation', ''),
+                msg.get('transaction', ''),
             )
             self._error_counter.inc(key)
         elif msg_type == 'start':
             key = _journey_key(
                 msg.get('test', ''),
                 msg.get('journey', ''),
-                msg.get('transation', ''),
+                msg.get('transaction', ''),
             )
             self._transaction_start_counter.inc(key)
         elif msg_type == 'end':
             key = _journey_key(
                 msg.get('test', ''),
                 msg.get('journey', ''),
-                msg.get('transation', ''),
+                msg.get('transaction', ''),
             )
             self._transaction_end_counter.inc(key)
             
