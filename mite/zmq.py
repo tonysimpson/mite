@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class ZMQSender:
     def __init__(self, socket_address):
         self._zmq_context = zmq.Context()
-        self._sock = self._zmq_context.socket(zmq.REQ)
+        self._sock = self._zmq_context.socket(zmq.PUSH)
         self._sock.connect(socket_address)
 
     def send(self, msg):
@@ -20,7 +20,7 @@ class ZMQSender:
 class ZMQReceiver:
     def __init__(self, socket_address, listeners=None, raw_listeners=None, loop=None):
         self._zmq_context = zmq.Context()
-        self._sock = self._zmq_context.socket(zmq.REP)
+        self._sock = self._zmq_context.socket(zmq.PULL)
         self._sock.bind(socket_address)
         if listeners is None:
             listeners = []

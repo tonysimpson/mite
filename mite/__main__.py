@@ -57,6 +57,56 @@ from .nanomsg import NanomsgSender, NanomsgReceiver, NanomsgRunnerTransport, Nan
 from .zmq import ZMQSender, ZMQReceiver, ZMQRunnerTransport, ZMQControllerServer
 import logging
 
+
+_MESSAGE_BACKENDS = ['ZMQ', 'nanomsg']
+
+
+def _check_message_backend(opts):
+    msg_backend = opts['--message-backend']
+    if msg_backend not in _MESSAGE_BACKENDS:
+        raise Exception('message backend %r not a valid option %r' % (msg_backend, _MESSAGE_BACKENDS))
+
+
+def _create_receiver(opts):
+    _check_message_backend(opts)
+    msg_backend = opts['--message-backend']
+    socket = opts['--message-socket']
+    if msg_backend == 'nanomsg':
+        return NanomsgReceiver(socket)
+    elif msg_backend == 'ZMQ':
+        return ZMQReceiver(socket)
+
+
+def _create_sender(opts):
+    _check_message_backend(opts)
+    msg_backend = opts['--message-backend']
+    socket = opts['--message-socket']
+    if msg_backend == 'nanomsg':
+        return NanomsgSender(socket)
+    elif msg_backend == 'ZMQ':
+        return ZMQSender(socket)
+
+
+def _create_runner_transport(opts):
+    _check_message_backend(opts)
+    msg_backend = opts['--message-backend']
+    socket = opts['--controller-socket']
+    if msg_backend == 'nanomsg':
+        return NanomsgRunnerTransport(socket)
+    elif msg_backend == 'ZMQ':
+        return ZMQRunnerTransport(socket)
+
+
+def _create_controller_server(opts):
+    _check_message_backend(opts)
+    msg_backend = opts['--message-backend']
+    socket = opts['--controller-socket']
+    if msg_backend == 'nanomsg':
+        return NanomsgControllerServer(socket)
+    elif msg_backend == 'ZMQ':
+        return ZMQControllerServer(socket)
+
+
 logger = logging.getLogger(__name__)
 
 class DirectRunnerTransport:
@@ -176,42 +226,21 @@ def controller(opts):
         scenario_manager.add_scenario(journey_spec, datapool, volumemodel)
     config_manager = _create_config_manager(opts)
     controller = Controller(scenario_spec, scenario_manager, config_manager)
-    msg_backend = opts['--message-backend']
-    if msg_backend == 'nanomsg':
-        server = NanomsgControllerServer(opts['--controller-socket'])
-    elif msg_backend == 'ZMQ':
-        server = ZMQControllerServer(opts['--controller-socket'])
-    else:
-        logger.info("Message backend {} not recognised, defaulting to ZMQ".format(msg_backend))
-        server = ZMQControllerServer(opts['--controller-socket'])
+    server = _create_controller_server(opts)
     asyncio.get_event_loop().run_until_complete(server.run(controller, controller.should_stop))
 
 
 def runner(opts):
     msg_backend = opts['--message-backend']
-    if msg_backend == 'nanomsg':
-        transport = NanomsgRunnerTransport(opts['--controller-socket'])
-        sender = NanomsgSender(opts['--message-socket'])
-    elif msg_backend == 'ZMQ':
-        transport = ZMQRunnerTransport(opts['--controller-socket'])
-        sender = ZMQSender(opts['--message-socket'])
-    else:
-        logger.info("Message backend {} not recognised, defaulting to ZMQ".format(msg_backend))
-        transport = ZMQRunnerTransport(opts['--controller-socket'])
-        sender = ZMQSender(opts['--message-socket'])
+    transport = _create_runner_transport(opts)
+    sender = _create_sender(opts)
     asyncio.get_event_loop().run_until_complete(_create_runner(opts, transport, sender.send).run())
 
 
 def collector(opts):
     _maybe_start_web_in_thread(opts)
     msg_backend = opts['--message-backend']
-    if msg_backend == 'nanomsg':
-        receiver = NanomsgReceiver(opts['--message-socket'])
-    elif msg_backend == 'ZMQ':
-        receiver = NanomsgReceiver(opts['--message-socket'])
-    else:
-        logger.info("Message backend {} not recognised, defaulting to ZMQ".format(msg_backend))
-        receiver = NanomsgReceiver(opts['--message-socket'])
+    receiver = _create_receiver(opts)
     collector = Collector()
     receiver.add_listener(metrics_processor.process_message)
     receiver.add_listener(collector.process_message)
