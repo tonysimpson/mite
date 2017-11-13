@@ -62,6 +62,7 @@ class KeyedHistogram:
 
 _response_key = namedtuple('_response_key', 'test journey transaction method code'.split())
 _journey_key = namedtuple('_journey_key', 'test journey transaction'.split())
+_error_key = namedtuple('_journey_key', 'test journey transaction location'.split())
 
 
 class MetricsProcessor:
@@ -91,10 +92,11 @@ class MetricsProcessor:
             self._response_counter.inc(key)
             self._response_histogram.add(key, msg['total_time'])
         elif msg_type == 'exception' or msg_type == 'error':
-            key = _journey_key(
+            key = _error_key(
                 msg.get('test', ''),
                 msg.get('journey', ''),
                 msg.get('transaction', ''),
+                msg.get('location', '')
             )
             self._error_counter.inc(key)
         elif msg_type == 'start':
