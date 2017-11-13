@@ -1,4 +1,4 @@
-import nanomsg
+import pyzmq
 
 from .utils import pack_msg, unpack_msg
 import asyncio
@@ -7,18 +7,20 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class NanomsgSender:
+class ZMQSender:
     def __init__(self, socket_address):
-        self._sock = nanomsg.Socket(nanomsg.PUSH)
+        self._zmq_context = pyzmq.Context()
+        self._sock = self._zmq_context.socket(pyzmq.REQ)
         self._sock.connect(socket_address)
 
     def send(self, msg):
         self._sock.send(pack_msg(msg))
 
 
-class NanomsgReceiver:
+class ZMQReceiver:
     def __init__(self, socket_address, listeners=None, raw_listeners=None, loop=None):
-        self._sock = nanomsg.Socket(nanomsg.PULL)
+        self._zmq_context = pyzmq.Context()
+        self._sock = self._zmq_context.socket(pyzmq.REP)
         self._sock.bind(socket_address)
         if listeners is None:
             listeners = []
@@ -57,9 +59,10 @@ _MSG_TYPE_REQUEST_WORK = 2
 _MSG_TYPE_BYE = 3
 
 
-class NanomsgRunnerTransport:
+class ZMQRunnerTransport:
     def __init__(self, socket_address, loop=None):
-        self._sock = nanomsg.Socket(nanomsg.REQ)
+        self._zmq_context = pyzmq.Context()
+        self._sock = self._zmq_context.socket(pyzmq.REQ)
         self._sock.connect(socket_address)
         if loop is None:
             loop = asyncio.get_event_loop()
@@ -91,9 +94,10 @@ class NanomsgRunnerTransport:
         return await self._loop.run_in_executor(None, self._request_work, runner_id)
 
 
-class NanomsgControllerServer:
+class ZMQControllerServer:
     def __init__(self, socket_address):
-        self._sock = nanomsg.Socket(nanomsg.REP)
+        self._zmq_context = pyzmq.Context()
+        self._sock = self._zmq_context.socket(pyzmq.REP)
         self._sock.bind(socket_address)
 
     async def run(self, controller, stop_func=None):
