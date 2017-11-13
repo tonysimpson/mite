@@ -62,7 +62,7 @@ class KeyedHistogram:
 
 _response_key = namedtuple('_response_key', 'test journey transaction method code'.split())
 _journey_key = namedtuple('_journey_key', 'test journey transaction'.split())
-_error_key = namedtuple('_journey_key', 'test journey transaction location'.split())
+_error_key = namedtuple('_journey_key', 'test journey transaction location message'.split())
 
 
 class MetricsProcessor:
@@ -94,10 +94,10 @@ class MetricsProcessor:
         elif msg_type == 'exception' or msg_type == 'error':
             key = _error_key(
                 msg.get('test', ''),
-                msg.get('message', ''),
                 msg.get('journey', ''),
                 msg.get('transaction', ''),
-                msg.get('location', '')
+                msg.get('location', ''),
+                msg.get('message', ''),
             )
             self._error_counter.inc(key)
         elif msg_type == 'start':
