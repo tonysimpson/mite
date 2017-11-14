@@ -122,7 +122,7 @@ class Context:
         message = str(value)
         ex_type = type(value).__name__
         location = self._tb_format_location(tb)
-        stacktrace = traceback.format_tb(tb)
+        stacktrace = ''.join(traceback.format_tb(tb))
         self.send('exception', message=message, ex_type=ex_type, location=location, stacktrace=stacktrace)
 
     def _send_mite_error(self, value, tb):
