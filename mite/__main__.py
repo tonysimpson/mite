@@ -109,6 +109,7 @@ def _create_controller_server(opts):
 
 logger = logging.getLogger(__name__)
 
+
 class DirectRunnerTransport:
     def __init__(self, controller):
         self._controller = controller
@@ -124,6 +125,8 @@ class DirectRunnerTransport:
 
 
 msg_logger = logging.getLogger('MSG')
+
+
 def _msg_handler(msg):
     metrics_processor.process_message(msg)
     if 'type' in msg and msg['type'] == 'data_created':
@@ -236,7 +239,6 @@ def controller(opts):
 
 
 def runner(opts):
-    msg_backend = opts['--message-backend']
     transport = _create_runner_transport(opts)
     sender = _create_sender(opts)
     asyncio.get_event_loop().run_until_complete(_create_runner(opts, transport, sender.send).run())
@@ -244,7 +246,6 @@ def runner(opts):
 
 def collector(opts):
     _maybe_start_web_in_thread(opts)
-    msg_backend = opts['--message-backend']
     receiver = _create_receiver(opts)
     collector = Collector()
     receiver.add_listener(metrics_processor.process_message)

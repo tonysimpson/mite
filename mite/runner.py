@@ -147,7 +147,6 @@ class Runner:
         config = RunnerConfig()
         runner_id, test_name, config_list = await self._transport.hello()
         config._update(config_list)
-        running = []
         logger.debug("Entering run loop")
         _completed_data_ids = []
         completed_data_ids = []
@@ -179,7 +178,6 @@ class Runner:
         while not self._stop:
             work, config_list, self._stop = await self._transport.request_work(runner_id, self._current_work(), completed_data_ids, self._max_work)
             config._update(config_list)
-            work_len = len(work)
             for num, (scenario_id, scenario_data_id, journey_spec, args) in enumerate(work):
                 id_data = {
                     'test': test_name,
