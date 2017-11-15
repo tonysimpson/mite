@@ -55,11 +55,12 @@ from .utils import spec_import, pack_msg
 from .web import app, metrics_processor
 from .nanomsg import NanomsgSender, NanomsgReceiver, NanomsgRunnerTransport, NanomsgControllerServer
 from .zmq import ZMQSender, ZMQReceiver, ZMQRunnerTransport, ZMQControllerServer
-from .logstats import HttpStatsLogger
-import logging
+from .logoutput import MsgOutput, HttpStatsOutput
 
 
 _MESSAGE_BACKENDS = ['ZMQ', 'nanomsg']
+
+
 
 
 def _check_message_backend(opts):
@@ -125,25 +126,36 @@ class DirectRunnerTransport:
         return self._controller.bye(runner_id)
 
 
-msg_logger = logging.getLogger('MSG')
+class DirectReciever:
+    def __init__(self):
+        self._listeners = []
+        self._raw_listeners = []
 
-http_stats_logger = HttpStatsLogger()
+    def add_listener(self, listener):
+        self._listeners.append(listener)
 
-def _msg_handler(msg):
-    http_stats_logger.process_message(msg)
-    metrics_processor.process_message(msg)
-    if 'type' in msg and msg['type'] == 'data_created':
-        open(msg['name'] + '.msgpack', 'ab').write(pack_msg(msg['data']))
-    start = "[%s] %.6f" % (msg.pop('type', None), msg.pop('time', None))
-    stacktrace = msg.pop('stacktrace', None)
-    if stacktrace:
-        message = msg.pop('message', None)
-        ex_type = msg.pop('ex_type', None)
-        end = ', '.join("%s=%r" % (k, v) for k, v in sorted(msg.items()))
-        msg_logger.warning("%s %s\n%s: %s\n%s", start, end, ex_type, message, stacktrace)
-    else:
-        end = ', '.join("%s=%r" % (k, v) for k, v in sorted(msg.items()))
-        msg_logger.debug("%s %s", start, end)
+    def add_raw_listener(self, raw_listener):
+        self._raw_listeners.append(raw_listener)
+
+    def recieve(self, msg):
+        for listener in self._listeners:
+            listener(msg)
+        packed_msg = pack_msg(msg)
+        for raw_listener in self._raw_listeners:
+            raw_listener(packed_msg)
+
+
+def _setup_msg_processors(reciever, opts):
+    collector = Collector()
+    msg_output = MsgOutput()
+    http_stats_output = HttpStatsOutput()
+
+    if not opts['--no-web']:
+        reciever.add_listener(metrics_processor.process_message)
+    reciever.add_listener(collector.process_message)
+    reciever.add_listener(http_stats_output.process_message)
+    reciever.add_listener(msg_output.process_message)
+    reciever.add_raw_listener(collector.process_raw_message)
 
 
 def _maybe_start_web_in_thread(opts):
@@ -199,7 +211,9 @@ def test_scenarios(test_name, opts, scenarios):
     config_manager = _create_config_manager(opts)
     controller = Controller(test_name, scenario_manager, config_manager)
     transport = DirectRunnerTransport(controller)
-    asyncio.get_event_loop().run_until_complete(_create_runner(opts, transport, _msg_handler).run())
+    reciever = DirectReciever()
+    _setup_msg_processors(reciever, opts)
+    asyncio.get_event_loop().run_until_complete(_create_runner(opts, transport, reciever.recieve).run())
 
 
 def scenario_test_cmd(opts):
@@ -249,11 +263,8 @@ def runner(opts):
 
 def collector(opts):
     _maybe_start_web_in_thread(opts)
-    receiver = _create_receiver(opts)
-    collector = Collector()
-    receiver.add_listener(metrics_processor.process_message)
-    receiver.add_listener(collector.process_message)
-    receiver.add_raw_listener(collector.process_raw_message)
+    reciever = _create_receiver(opts)
+    _setup_msg_processors(reciever, opts)
     asyncio.get_event_loop().run_until_complete(receiver.run())
 
 

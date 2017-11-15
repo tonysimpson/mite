@@ -35,7 +35,7 @@ class _TransactionContextManager:
 
     async def __aexit__(self, exception_type, exception_val, traceback):
         try:
-            if exception_val and not isinstance(exception_val, HandledException):
+            if exception_val and not isinstance(exception_val, (HandledException, KeyboardInterrupt)):
                 if isinstance(exception_val, MiteError):
                     self._ctx._send_mite_error(exception_val, traceback)
                 else:
@@ -59,6 +59,8 @@ class _ExceptionHandlerContextManager:
 
     async def __aexit__(self, exception_type, exception_val, traceback):
         if exception_val:
+            if isinstance(exception_val, KeyboardInterrupt):
+                return False
             if not isinstance(exception_val, HandledMiteError):
                 if not isinstance(exception_val, HandledException):
                     self._ctx._send_exception(exception_val, traceback)

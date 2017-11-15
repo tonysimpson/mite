@@ -58,13 +58,6 @@ class Collector:
         if 'type' in msg:
             if msg['type'] == 'data_created':
                 open(os.path.join(self._target_dir, msg['name'] + '.msgpack'), 'ab').write(pack_msg(msg['data']))
-            elif msg['type'] == 'end':
-                self._tps_count += 1
-        t = time.time()
-        if t > self._tps_start + 1:
-            print('\rTPS %.3f' % (self._tps_count / (t - self._tps_start),), end="")
-            self._tps_start = t
-            self._tps_count = 0
 
         
 
