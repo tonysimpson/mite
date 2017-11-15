@@ -5,6 +5,7 @@ import warnings
 
 from .exceptions import MiteError
 
+
 class HandledException(BaseException):
     def __init__(self, original_exception, original_tb):
         self.original_exception = original_exception
@@ -35,13 +36,15 @@ class _TransactionContextManager:
     async def __aexit__(self, exception_type, exception_val, traceback):
         try:
             if exception_val and not isinstance(exception_val, HandledException):
+                if isinstance(exception_val, MiteError):
+                    self._ctx._send_mite_error(exception_val, traceback)
+                else:
+                    self._ctx._send_exception(exception_val, traceback)
                 if self._ctx._debug:
                     drop_to_debugger(traceback)
                 if isinstance(exception_val, MiteError):
-                    self._ctx._send_mite_error(exception_val, traceback)
                     raise HandledMiteError(exception_val, traceback)
                 else:
-                    self._ctx._send_exception(exception_val, traceback)
                     raise HandledException(exception_val, traceback)
         finally:
             self._ctx._end_transaction()
@@ -55,12 +58,14 @@ class _ExceptionHandlerContextManager:
         pass
 
     async def __aexit__(self, exception_type, exception_val, traceback):
-        if exception_val and not isinstance(exception_val, HandledMiteError):
-            if not isinstance(exception_val, HandledException):
-                if self._ctx._debug:
-                    drop_to_debugger(traceback)
-                self._ctx._send_exception(exception_val, traceback)
-            await asyncio.sleep(1)
+        if exception_val:
+            if not isinstance(exception_val, HandledMiteError):
+                if not isinstance(exception_val, HandledException):
+                    self._ctx._send_exception(exception_val, traceback)
+                    if self._ctx._debug:
+                        drop_to_debugger(traceback)
+                await asyncio.sleep(1)
+            return not self._ctx._debug
         return True
 
 

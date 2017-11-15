@@ -148,14 +148,10 @@ class Runner:
         runner_id, test_name, config_list = await self._transport.hello()
         config._update(config_list)
         logger.debug("Entering run loop")
-        _completed_data_ids = []
-        completed_data_ids = []
+        _completed = []
         def on_completion(f):
-            nonlocal waiter, _completed_data_ids
-            scenario_id, scenario_data_id = f.result()
-            self._dec_work(scenario_id)
-            if scenario_data_id is not None:
-                _completed_data_ids.append((scenario_id, scenario_data_id))
+            nonlocal waiter, _completed
+            _completed.append(f)
             if not waiter.done():
                 waiter.set_result(None)
         def stop_waiting():
@@ -163,18 +159,22 @@ class Runner:
             if not waiter.done():
                 waiter.set_result(None)
         async def wait():
-            nonlocal waiter, timeout_handle, _completed_data_ids
+            nonlocal waiter, timeout_handle, _completed
             await waiter
             timeout_handle.cancel()
             timeout_handle = self._loop.call_later(self._loop_wait_max, stop_waiting)
             waiter = self._loop.create_future()
-            c = _completed_data_ids
-            _completed_data_ids = []
+            c = []
+            for f in _completed: 
+                scenario_id, scenario_data_id = f.result()
+                self._dec_work(scenario_id)
+                if scenario_data_id is not None:
+                    c.append((scenario_id, scenario_data_id))
+            del _completed[:]
             return c
-
         timeout_handle = self._loop.call_later(self._loop_wait_max, stop_waiting)
         waiter = self._loop.create_future()
-
+        completed_data_ids = []
         while not self._stop:
             work, config_list, self._stop = await self._transport.request_work(runner_id, self._current_work(), completed_data_ids, self._max_work)
             config._update(config_list)

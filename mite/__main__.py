@@ -22,7 +22,7 @@ Examples:
 Options:
     -h --help                       Show this screen
     --version                       Show version
-    --debugging                     Drop into IPDB on journey error
+    --debugging                     Drop into IPDB on journey error and exit
     --log-level=LEVEL               Set logger level, one of DEBUG, INFO, WARNING, ERROR, CRITICAL [default: INFO]
     --config=CONFIG_SPEC            Set a config loader to a callable loaded via a spec [default: mite.config:default_config_loader]
     --no-web                        Don't start the build in webserver
