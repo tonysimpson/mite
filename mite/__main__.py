@@ -55,6 +55,7 @@ from .utils import spec_import, pack_msg
 from .web import app, metrics_processor
 from .nanomsg import NanomsgSender, NanomsgReceiver, NanomsgRunnerTransport, NanomsgControllerServer
 from .zmq import ZMQSender, ZMQReceiver, ZMQRunnerTransport, ZMQControllerServer
+from .logstats import HttpStatsLogger
 import logging
 
 
@@ -126,8 +127,10 @@ class DirectRunnerTransport:
 
 msg_logger = logging.getLogger('MSG')
 
+http_stats_logger = HttpStatsLogger()
 
 def _msg_handler(msg):
+    http_stats_logger.process_message(msg)
     metrics_processor.process_message(msg)
     if 'type' in msg and msg['type'] == 'data_created':
         open(msg['name'] + '.msgpack', 'ab').write(pack_msg(msg['data']))
@@ -140,7 +143,7 @@ def _msg_handler(msg):
         msg_logger.warning("%s %s\n%s: %s\n%s", start, end, ex_type, message, stacktrace)
     else:
         end = ', '.join("%s=%r" % (k, v) for k, v in sorted(msg.items()))
-        msg_logger.info("%s %s", start, end)
+        msg_logger.debug("%s %s", start, end)
 
 
 def _maybe_start_web_in_thread(opts):
