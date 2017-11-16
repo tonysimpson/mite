@@ -263,8 +263,8 @@ def runner(opts):
 
 def collector(opts):
     _maybe_start_web_in_thread(opts)
-    reciever = _create_receiver(opts)
-    _setup_msg_processors(reciever, opts)
+    receiver = _create_receiver(opts)
+    _setup_msg_processors(receiver, opts)
     asyncio.get_event_loop().run_until_complete(receiver.run())
 
 
