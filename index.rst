@@ -10,7 +10,7 @@ Welcome to Mite's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-
+   docs/api_docs.rst
 
 Indices and tables
 ==================
