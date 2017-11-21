@@ -17,7 +17,6 @@ class ElementNotFoundError(MiteError):
 
 
 def url_builder(base_url, *args, **kwargs):
-    new_args = []
     url = base_url
     for arg in args:
         url = urljoin(url, arg)
@@ -97,7 +96,7 @@ class Page(Resource):
     """Page object built from a HTML response."""
     def __init__(self, response, browser):
         super().__init__(response, browser)
-        self.dom = BeautifulSoup(response.text, "html.parser")
+        self._dom = None
         self.scripts = []
         self.stylesheets = []
         self.resources = []
@@ -108,6 +107,12 @@ class Page(Resource):
             return True
         else:
             raise ElementNotFoundError(name=name, attrs=attrs, text=text, **kwargs)
+
+    @property
+    def dom(self):
+        if self._dom is None:
+            self._dom = BeautifulSoup(self.response.text, "html.parser")
+        return self._dom
 
     @property
     def cookies(self):
@@ -181,12 +186,12 @@ class Page(Resource):
         # awaitable dom ready
         pass
 
-    def get_form(self, name=None):
-        form, = [f for f in self.get_forms() if name is None or f.name == name]
+    def get_form(self, name=None, *args, **kwargs):
+        form, = [f for f in self.get_forms(*args, **kwargs) if name is None or f.name == name]
         return form
 
-    def get_forms(self):
-        return [Form(e, self) for e in self.find_all('form')]
+    def get_forms(self, *args, **kwargs):
+        return [Form(e, self) for e in self.find_all('form', *args, **kwargs)]
 
     async def click_link(self, text):
         elem = self.find('a', text=text)

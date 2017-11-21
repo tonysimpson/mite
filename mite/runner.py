@@ -1,7 +1,5 @@
 import asyncio
 from itertools import count
-from collections import deque
-import concurrent.futures
 import time
 import logging
 
