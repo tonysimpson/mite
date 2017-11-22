@@ -108,7 +108,7 @@ class ScenarioManager:
                     try:
                         dpi = scenario.datapool.checkout()
                     except DataPoolExhausted:
-                        logger.info('Removed scenario %d because data pool exhausted', scenario_ids)
+                        logger.info('Removed scenario %d because data pool exhausted', scenario_id)
                         del self._scenarios[scenario_id]
                         continue
                     else:
