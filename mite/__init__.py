@@ -1,3 +1,9 @@
+"""
+.. module:: mite
+   :synopsis: Functions for use with Mite
+
+"""
+
 import time
 import asyncio
 import random
@@ -33,19 +39,44 @@ class ensure_seperation_from_callable:
             await asyncio.sleep(sleep_time, loop=self._loop)
         
 
-def ensure_fixed_seperation(seperation, loop=None):
-    def fixed_seperation():
-        return seperation
-    return ensure_seperation_from_callable(fixed_seperation, loop=loop)
+def ensure_fixed_seperation(separation, loop=None):
+    """Context manager which will ensure calls to a callable are separated by a fixed wait time of separation value
+
+    Args:
+        separation: integer or float value for how far to space callables
+
+    Kwargs:
+        loop: Event loop to apply the wait to, defaults to asyncio.get_event_loop()
+
+    Example usage:
+    >>> with ensure_fixed_seperation(5):
+    >>>     do_something()
+   """
+    def fixed_separation():
+        return separation
+    return ensure_seperation_from_callable(fixed_separation, loop=loop)
 
 
-def ensure_average_seperation(mean_seperation, plus_minus=None, loop=None):
+def ensure_average_separation(mean_separation, plus_minus=None, loop=None):
+    """Context manager which will ensure calls to a callable are separated by an average wait time of separation value
+
+    Args:
+        separation: integer or float value for how far to space callables
+
+    Kwargs:
+        loop:       Event loop to apply the wait to, defaults to asyncio.get_event_loop()
+        plus_minus: integer or float threshold to vary the wait by
+
+    Example usage:
+    >>> with ensure_average_seperation(5):
+    >>>     do_something()
+   """
     if plus_minus is None:
-        plus_minus = mean_seperation * .25
+        plus_minus = mean_separation * .25
 
-    def average_seperation():
-        return mean_seperation + (random.random() * plus_minus * 2) - plus_minus
+    def average_separation():
+        return mean_separation + (random.random() * plus_minus * 2) - plus_minus
 
-    return ensure_seperation_from_callable(average_seperation, loop=loop)
+    return ensure_seperation_from_callable(average_separation, loop=loop)
 
 
