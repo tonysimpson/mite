@@ -13,7 +13,7 @@ class OptionError(MiteError):
 
 class ElementNotFoundError(MiteError):
     def __init__(self, **kwargs):
-        super().__init__("Could not find element in page with search terms", **kwargs)
+        super().__init__("Could not find element in page with search terms: {}".format(kwargs), **kwargs)
 
 
 def url_builder(base_url, *args, **kwargs):
