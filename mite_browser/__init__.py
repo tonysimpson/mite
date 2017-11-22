@@ -2,7 +2,7 @@ import asyncio
 from bs4 import BeautifulSoup
 from urllib.parse import urlencode, urljoin
 from re import compile as re_compile, IGNORECASE, escape
-from mite import MiteError, ensure_fixed_seperation
+from mite import MiteError, ensure_fixed_separation
 import mite_http
 
 
@@ -30,7 +30,7 @@ def browser_decorator(separation=0):
         async def wrapper(context, *args, **kwargs):
             async with mite_http.get_session_pool().session_context(context):
                 context.browser = Browser(context.http)
-                async with ensure_fixed_seperation(separation):
+                async with ensure_fixed_separation(separation):
                     result = await func(context, *args, **kwargs)
                 del context.browser
                 return result
