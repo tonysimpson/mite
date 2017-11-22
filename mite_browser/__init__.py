@@ -2,7 +2,7 @@ import asyncio
 from bs4 import BeautifulSoup
 from urllib.parse import urlencode, urljoin
 from re import compile as re_compile, IGNORECASE, escape
-from mite import MiteError, ensure_fixed_seperation
+from mite import MiteError, ensure_fixed_separation
 import mite_http
 
 
@@ -30,7 +30,7 @@ def browser_decorator(separation=0):
         async def wrapper(context, *args, **kwargs):
             async with mite_http.get_session_pool().session_context(context):
                 context.browser = Browser(context.http)
-                async with ensure_fixed_seperation(separation):
+                async with ensure_fixed_separation(separation):
                     result = await func(context, *args, **kwargs)
                 del context.browser
                 return result
@@ -186,12 +186,12 @@ class Page(Resource):
         # awaitable dom ready
         pass
 
-    def get_form(self, name=None, *args, **kwargs):
-        form, = [f for f in self.get_forms(*args, **kwargs) if name is None or f.name == name]
+    def get_form(self, name=None):
+        form, = [f for f in self.get_forms() if name is None or f.name == name]
         return form
 
-    def get_forms(self, *args, **kwargs):
-        return [Form(e, self) for e in self.find_all('form', *args, **kwargs)]
+    def get_forms(self):
+        return [Form(e, self) for e in self.find_all('form')]
 
     async def click_link(self, text):
         elem = self.find('a', text=text)
