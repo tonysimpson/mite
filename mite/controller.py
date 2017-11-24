@@ -18,10 +18,10 @@ class WorkTracker:
         for k, v in work.items():
             current[k] += v
     
-    def get_total_work(self):
+    def get_total_work(self, runner_ids):
         totals = defaultdict(int)
-        for work in self._all_work.values():
-            for k, v in work.items():
+        for runner_id in runner_ids:
+            for k, v in self._all_work[runner_id].items():
                 totals[k] += v
         return totals
 
@@ -54,9 +54,12 @@ class RunnerTracker:
     def remove_runner(self, runner_id):
         del self._last_seen[runner_id]
 
-    def get_active_count(self):
+    def get_active(self):
         t = time.time()
-        return sum(1 for k, v in self._last_seen.items() if v + self._timeout > t)
+        return [k for k, v in self._last_seen.items() if v + self._timeout > t]
+
+    def get_active_count(self):
+        return len(self.get_active())
 
 
 class Controller:
@@ -80,10 +83,10 @@ class Controller:
     
     def _required_work_for_runner(self, runner_id, max_work=None):
         runner_total = self._work_tracker.get_runner_total(runner_id)
-        active_runners = self._runner_tracker.get_active_count()
-        current_work = self._work_tracker.get_total_work()
+        active_runner_ids = self._runner_tracker.get_active()
+        current_work = self._work_tracker.get_total_work(active_runner_ids)
         hit_rate = self._runner_tracker.get_hit_rate()
-        work, scenario_volume_map = self._scenario_manager.get_work(current_work, runner_total, active_runners, max_work, hit_rate)
+        work, scenario_volume_map = self._scenario_manager.get_work(current_work, runner_total, len(active_runner_ids), max_work, hit_rate)
         self._add_assumed(runner_id, scenario_volume_map) 
         return work
 

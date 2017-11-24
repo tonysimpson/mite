@@ -78,9 +78,11 @@ class ZMQRunnerTransport:
     def _request_work(self, runner_id, current_work, completed_data_ids, max_work):
         logger.debug('socket send')
         self._sock.send(pack_msg((_MSG_TYPE_REQUEST_WORK, [runner_id, current_work, completed_data_ids, max_work])))
-        logging.debug('socket receive')
-        result = unpack_msg(self._sock.recv())
-        logging.debug('done') 
+        logger.debug('socket receive')
+        msg = self._sock.recv()
+        logger.debug('got response')
+        result = unpack_msg(msg)
+        logger.debug('done') 
         return result
 
     async def request_work(self, runner_id, current_work, completed_data_ids, max_work):
