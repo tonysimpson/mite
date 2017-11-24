@@ -13,6 +13,8 @@ class OptionError(MiteError):
 
 class ElementNotFoundError(MiteError):
     def __init__(self, **kwargs):
+        text = kwargs.pop('text', '').replace("'", "").replace('"', '')
+        kwargs['text'] = text
         super().__init__("Could not find element in page with search terms: {}".format(kwargs), **kwargs)
 
 
