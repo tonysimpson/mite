@@ -74,21 +74,18 @@ class ScenarioManager:
         required = self.get_required_work()
         diff = _volume_dicts_remove_a_from_b(current_work, required)
         total = sum(required.values())
-        if num_runners > 1:
-            work_share = total / num_runners
-        else:
-            work_share=total
-        runners_share_limit = max(0, int((work_share - num_runner_current_work) + 0.5))
-        limit = runners_share_limit
+        runners_share_limit = total / num_runners - num_runner_current_work 
+        limit = max(0, runners_share_limit)
         if runner_self_limit is not None:
-            limit = min(runner_self_limit, runners_share_limit)
+            limit = min(limit, runners_share_limit)
         spawn_limit = None
         if self._spawn_rate is not None and hit_rate > 1:
-            spawn_limit_f = self._spawn_rate / hit_rate
-            spawn_limit = int(spawn_limit_f)
-            if (spawn_limit_f % 1) > random.random():
-                spawn_limit += 1
+            spawn_limit = self._spawn_rate / hit_rate
             limit = min(limit, spawn_limit)
+        if limit % 1:
+            if limit % 1 > random.random():
+                limit += 1
+        limit = int(limit)
         def _yield(diff):
             for k, v in diff.items():
                 for i in range(v):
