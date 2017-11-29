@@ -213,7 +213,12 @@ def test_scenarios(test_name, opts, scenarios):
     transport = DirectRunnerTransport(controller)
     reciever = DirectReciever()
     _setup_msg_processors(reciever, opts)
-    asyncio.get_event_loop().run_until_complete(_create_runner(opts, transport, reciever.recieve).run())
+    loop = asyncio.get_event_loop()
+    def controller_report():
+        controller.report(reciever.recieve)
+        loop.call_later(1, controller_report)
+    loop.call_later(1, controller_report)
+    loop.run_until_complete(_create_runner(opts, transport, reciever.recieve).run())
 
 
 def scenario_test_cmd(opts):
@@ -252,8 +257,13 @@ def controller(opts):
     config_manager = _create_config_manager(opts)
     controller = Controller(scenario_spec, scenario_manager, config_manager)
     server = _create_controller_server(opts)
-    asyncio.get_event_loop().run_until_complete(server.run(controller, controller.should_stop))
-
+    sender = _create_sender(opts)
+    loop = asyncio.get_event_loop()
+    def controller_report():
+        controller.report(sender.send)
+        loop.call_later(1, controller_report)
+    loop.call_later(1, controller_report)
+    loop.run_until_complete(server.run(controller, controller.should_stop))
 
 def runner(opts):
     transport = _create_runner_transport(opts)

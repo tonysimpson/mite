@@ -97,6 +97,19 @@ class Controller:
         work = self._required_work_for_runner(runner_id, max_work)
         return work, self._config_manager.get_changes_for_runner(runner_id), not self._scenario_manager.is_active()
 
+    def report(self, sender):
+        required = self._scenario_manager.get_required_work()
+        active_runner_ids = self._runner_tracker.get_active()
+        actual = self._work_tracker.get_total_work(active_runner_ids)
+        sender({
+            'type': 'controller_report', 
+            'time': time.time(),
+            'test': self._testname,
+            'required': required, 
+            'actual': actual, 
+            'num_runners': len(active_runner_ids)
+        })
+
     def should_stop(self):
         return (not self._scenario_manager.is_active()) and self._runner_tracker.get_active_count() == 0
 
