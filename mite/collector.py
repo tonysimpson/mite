@@ -22,13 +22,13 @@ class Collector:
         self._current_fn = os.path.join(self._target_dir, 'current')
         self._current_st_fn = os.path.join(self._target_dir, 'current_start_time')
         if os.path.isfile(self._current_fn):
-            logging.debug('rotating pre-existing current file %s', self._current_fn)
+            logger.debug('rotating pre-existing current file %s', self._current_fn)
             with open(self._current_st_fn) as f:
                 start_time = f.read()
             end_time = int(time.time())
             c = next(self._file_counter)
             fn = os.path.join(self._target_dir, '%s_%s_%s' % (start_time, end_time, c))
-            logging.warn('moving old current %s to %s', self._current_fn, fn)
+            logger.warn('moving old current %s to %s', self._current_fn, fn)
             os.rename(self._current_fn, fn)
         with open(self._current_st_fn, 'w') as f:
             f.write(str(int(time.time())))
@@ -48,7 +48,7 @@ class Collector:
             end_time = int(time.time())
             c = next(self._file_counter)
             fn = os.path.join(self._target_dir, '%s_%s_%s' % (start_time, end_time, c))
-            logging.info('moving current %s to %s', self._current_fn, fn)
+            logger.info('moving current %s to %s', self._current_fn, fn)
             os.rename(self._current_fn, fn)
             with open(self._current_st_fn, 'w') as f:
                 f.write(str(end_time))
