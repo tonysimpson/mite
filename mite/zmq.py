@@ -97,12 +97,18 @@ class ZMQRunnerTransport:
 
 
 class ZMQControllerServer:
-    def __init__(self, socket_address):
+    def __init__(self, socket_address, loop=None):
         self._zmq_context = zmq.Context()
         self._sock = self._zmq_context.socket(zmq.REP)
         self._sock.bind(socket_address)
+        if loop is None:
+            loop = asyncio.get_event_loop()
+        self._loop = loop
 
     async def run(self, controller, stop_func=None):
+        return await self._loop.run_in_executor(None, self._run, controller, stop_func)
+
+    def _run(self, controller, stop_func=None):
         while stop_func is None or not stop_func():
             _type, content = unpack_msg(self._sock.recv())
             if _type == _MSG_TYPE_HELLO:
