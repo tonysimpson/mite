@@ -33,14 +33,7 @@ class SessionPool:
         return wrapper
 
     async def _checkout(self, context):
-        logger.debug('Session pool size %d', len(self._pool))
-        if self._pool:
-            session = self._pool.pop()
-            await session.erase_all_cookies()
-            logger.debug('Session from pool %r', session)
-        else:
-            session = self._el.session()
-            logger.debug('New session %r', session)
+        session = self._el.session()
         def response_callback(r):
             context.send('http_curl_metrics', 
                 start_time=r.start_time, 
@@ -59,9 +52,7 @@ class SessionPool:
         return session
 
     async def _checkin(self, session):
-        logger.debug('return session %r', session)
-        session.set_response_callback(None)
-        self._pool.append(session)
+        pass 
 
 
 def get_session_pool():
