@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class Collector:
-    def __init__(self, target_dir=None, roll_after_n_messages=10000):
+    def __init__(self, target_dir=None, roll_after_n_messages=100000):
         if target_dir is None:
             target_dir = 'collector_data'
         self._target_dir = os.path.abspath(target_dir)

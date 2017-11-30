@@ -36,8 +36,9 @@ Options:
     --volume=VOLUME                 Volume to run journey at [default: 1]
     --web-address=HOST_POST         Web bind address [default: 127.0.0.1:9301]
     --message-backend=BACKEND       Backend to transport messages over [default: ZMQ]
-    --exclude-working-directory     By default mite puts the current directory on the python path.
-
+    --exclude-working-directory     By default mite puts the current directory on the python path
+    --collector-dir=DIRECTORY       Set the collectors output directory [default: collector_data]
+    --collector-role=NUM_LINES      How many lines per collector output file [default: 100000]
 """
 import sys
 import os
@@ -57,10 +58,7 @@ from .nanomsg import NanomsgSender, NanomsgReceiver, NanomsgRunnerTransport, Nan
 from .zmq import ZMQSender, ZMQReceiver, ZMQRunnerTransport, ZMQControllerServer
 from .logoutput import MsgOutput, HttpStatsOutput
 
-
 _MESSAGE_BACKENDS = ['ZMQ', 'nanomsg']
-
-
 
 
 def _check_message_backend(opts):
@@ -146,7 +144,7 @@ class DirectReciever:
 
 
 def _setup_msg_processors(reciever, opts):
-    collector = Collector()
+    collector = Collector(opts['--collector-dir'], int(opts['--collector-role']))
     msg_output = MsgOutput()
     http_stats_output = HttpStatsOutput()
 

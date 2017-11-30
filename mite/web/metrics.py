@@ -65,7 +65,6 @@ class Histogram:
             _total_count = self._total_counts[key]
             yield dict(zip(self._labels, key)), _sum, _total_count, zip(self._bins, bin_counts)
 
-
 class MetricsProcessor:
     def __init__(self):
         self._error_counter = Counter('test journey transaction location message'.split())
@@ -74,8 +73,8 @@ class MetricsProcessor:
         self._transaction_end_counter = Counter(transaction_key)
         self._transaction_count_gauge = Gauge(transaction_key)
         self._response_counter = Counter('test journey transaction method code'.split())
-        self._response_histogram = Histogram('test journey transaction method code'.split(), [0.00001, 0.0001, 0.001,
-            0.01, 0.05, 0.1, 0.15, 0.2, 0.4, 0.6, 0.8, 1, 2, 4, 8, 16])
+        self._response_histogram = Histogram('transaction'.split(), [0.0001, 0.001,
+            0.01, 0.05, 0.1, 0.2, 0.4, 0.8, 1, 2, 4, 8, 16, 32, 64])
         self._msg_delay = 0
         volume_key = 'test scenario_id'.split()
         self._actual = Gauge(volume_key)
@@ -89,15 +88,16 @@ class MetricsProcessor:
             self._msg_delay = time.time() - msg['time']
         msg_type = msg['type']
         if msg_type == 'http_curl_metrics':
+            transaction = msg.get('transaction', '')
             key = (
                 msg.get('test', ''),
                 msg.get('journey', ''),
-                msg.get('transaction', ''),
+                transaction,
                 msg['method'],
                 msg['response_code']
             )
             self._response_counter.inc(key)
-            self._response_histogram.add(key, msg['total_time'])
+            self._response_histogram.add((transaction,), msg['total_time'])
         elif msg_type == 'exception' or msg_type == 'error':
             key = (
                 msg.get('test', ''),
