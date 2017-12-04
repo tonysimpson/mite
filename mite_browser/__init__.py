@@ -31,7 +31,7 @@ def browser_decorator(separation=0):
     def wrapper_factory(func):
         async def wrapper(context, *args, **kwargs):
             async with mite_http.get_session_pool().session_context(context):
-                context.browser = Browser(context.http)
+                context.browser = Browser(context)
                 async with ensure_fixed_separation(separation):
                     result = await func(context, *args, **kwargs)
                 del context.browser
@@ -42,8 +42,9 @@ def browser_decorator(separation=0):
 
 class Browser:
     """Browser abstraction wraps a session and provides some behaviour that is closer to a real browser."""
-    def __init__(self, session, embedded_res=False):
-        self._session = session
+    def __init__(self, context, embedded_res=True):
+        self._context = context
+        self._session = context.http
         self._embedded_res = embedded_res
 
     async def _download_resource(self, url, page, type):
@@ -64,7 +65,8 @@ class Browser:
         resp = await self._session.request(method, url, *args, **kwargs)
         page = Page(resp, self)
         if embedded_res:
-            await self._download_resources(page)
+            async with self._ctx.transaction(self._ctx._transaction_name + " - embedded resources"):
+                await self._download_resources(page)
         return page
 
     @property
