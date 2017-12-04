@@ -2,8 +2,9 @@ from collections import namedtuple
 import time
 
 
-class KeyedMetricsCounter:
-    def __init__(self):
+class Counter:
+    def __init__(self, labels):
+        self._labels = labels
         self._metrics = {}
     
     def inc(self, key):
@@ -14,26 +15,31 @@ class KeyedMetricsCounter:
 
     def iter_counts(self):
         for key, value in sorted(self._metrics.items()):
-            yield key, value
+            yield dict(zip(self._labels, key)), value
 
 
-class KeyedMetricsSumCounter:
-    def __init__(self):
+class Gauge:
+    def __init__(self, labels):
+        self._labels = labels
         self._metrics = {}
     
-    def add(self, key, value):
+    def change_by(self, key, value):
         if key not in self._metrics:
             self._metrics[key] = value
         else:
             self._metrics[key] += value
+    
+    def set(self, key, value):
+        self._metrics[key] = value
 
     def iter_counts(self):
         for key, value in sorted(self._metrics.items()):
-            yield key, value
+            yield dict(zip(self._labels, key)), value
 
 
-class KeyedHistogram:
-    def __init__(self, bins):
+class Histogram:
+    def __init__(self, labels, bins):
+        self._labels = labels
         self._bin_counts = {}
         self._sums = {}
         self._total_counts = {}
@@ -57,23 +63,23 @@ class KeyedHistogram:
         for key, bin_counts in sorted(self._bin_counts.items()):
             _sum = self._sums[key]
             _total_count = self._total_counts[key]
-            yield key, _sum, _total_count, zip(self._bins, bin_counts)
-
-
-_response_key = namedtuple('_response_key', 'test journey transaction method code'.split())
-_journey_key = namedtuple('_journey_key', 'test journey transaction'.split())
-_error_key = namedtuple('_journey_key', 'test journey transaction location message'.split())
-
+            yield dict(zip(self._labels, key)), _sum, _total_count, zip(self._bins, bin_counts)
 
 class MetricsProcessor:
     def __init__(self):
-        self._error_counter = KeyedMetricsCounter()
-        self._transaction_start_counter = KeyedMetricsCounter()
-        self._transaction_end_counter = KeyedMetricsCounter()
-        self._response_counter = KeyedMetricsCounter()
-        self._response_histogram = KeyedHistogram([0.00001, 0.0001, 0.001,
-            0.01, 0.05, 0.1, 0.15, 0.2, 0.4, 0.6, 0.8, 1, 2, 4, 8, 16])
+        self._error_counter = Counter('test journey transaction location message'.split())
+        transaction_key = 'test journey transaction'.split()
+        self._transaction_start_counter = Counter(transaction_key)
+        self._transaction_end_counter = Counter(transaction_key)
+        self._transaction_count_gauge = Gauge(transaction_key)
+        self._response_counter = Counter('test journey transaction method code'.split())
+        self._response_histogram = Histogram('transaction'.split(), [0.0001, 0.001,
+            0.01, 0.05, 0.1, 0.2, 0.4, 0.8, 1, 2, 4, 8, 16, 32, 64])
         self._msg_delay = 0
+        volume_key = 'test scenario_id'.split()
+        self._actual = Gauge(volume_key)
+        self._required = Gauge(volume_key)
+        self._num_runners = Gauge(['test'])
 
     def process_message(self, msg):
         if 'type' not in msg:
@@ -82,17 +88,18 @@ class MetricsProcessor:
             self._msg_delay = time.time() - msg['time']
         msg_type = msg['type']
         if msg_type == 'http_curl_metrics':
-            key = _response_key(
+            transaction = msg.get('transaction', '')
+            key = (
                 msg.get('test', ''),
                 msg.get('journey', ''),
-                msg.get('transaction', ''),
+                transaction,
                 msg['method'],
                 msg['response_code']
             )
             self._response_counter.inc(key)
-            self._response_histogram.add(key, msg['total_time'])
+            self._response_histogram.add((transaction,), msg['total_time'])
         elif msg_type == 'exception' or msg_type == 'error':
-            key = _error_key(
+            key = (
                 msg.get('test', ''),
                 msg.get('journey', ''),
                 msg.get('transaction', ''),
@@ -101,20 +108,28 @@ class MetricsProcessor:
             )
             self._error_counter.inc(key)
         elif msg_type == 'start':
-            key = _journey_key(
+            key = (
                 msg.get('test', ''),
                 msg.get('journey', ''),
                 msg.get('transaction', ''),
             )
             self._transaction_start_counter.inc(key)
+            self._transaction_count_gauge.change_by(key, 1)
         elif msg_type == 'end':
-            key = _journey_key(
+            key = (
                 msg.get('test', ''),
                 msg.get('journey', ''),
                 msg.get('transaction', ''),
             )
             self._transaction_end_counter.inc(key)
-            
+            self._transaction_count_gauge.change_by(key, -1)
+        elif msg_type == 'controller_report':
+            test = msg['test']
+            self._num_runners.set((test,), msg['num_runners'])
+            for scenario_id, value in msg['actual'].items():
+                self._actual.set((test, scenario_id), value)
+            for scenario_id, value in msg['required'].items():
+                self._required.set((test, scenario_id), value)
 
     def prometheus_metrics(self):
         def format_dict(d):
@@ -122,29 +137,47 @@ class MetricsProcessor:
         lines = []
         lines.append('# TYPE mite_message_delay gauge')
         lines.append('mite_message_delay {} %s' % (self._msg_delay,))
-        for key, value in self._response_counter.iter_counts():
-            lines.append('mite_http_response_total {%s} %s' % (format_dict(key._asdict()), value))
+        lines.append('')
+        lines.append('# TYPE mite_http_response_total counter')
+        for labels, value in self._response_counter.iter_counts():
+            lines.append('mite_http_response_total {%s} %s' % (format_dict(labels), value))
+        lines.append('')
+        lines.append('# TYPE mite_transaction_count gauge')
+        for labels, value in self._transaction_count_gauge.iter_counts():
+            lines.append('mite_transaction_count {%s} %s' % (format_dict(labels), value))
+        lines.append('')
+        lines.append('# TYPE mite_runner_count gauge')
+        for labels, value in self._num_runners.iter_counts():
+            lines.append('mite_runner_count {%s} %s' % (format_dict(labels), value))
+        lines.append('')
+        lines.append('# TYPE mite_actual_count gauge')
+        for labels, value in self._actual.iter_counts():
+            lines.append('mite_actual_count {%s} %s' % (format_dict(labels), value))
+        lines.append('')
+        lines.append('# TYPE mite_requird_count gauge')
+        for labels, value in self._required.iter_counts():
+            lines.append('mite_required_count {%s} %s' % (format_dict(labels), value))
         lines.append('')
         lines.append('# TYPE mite_journey_error_total counter')
-        for key, value in self._error_counter.iter_counts():
-            lines.append('mite_journey_error_total {%s} %s' % (format_dict(key._asdict()), value))
+        for labels, value in self._error_counter.iter_counts():
+            lines.append('mite_journey_error_total {%s} %s' % (format_dict(labels), value))
         lines.append('')
         lines.append('# TYPE mite_transaction_start_total counter')
-        for key, value in self._transaction_start_counter.iter_counts():
-            lines.append('mite_transaction_start_total {%s} %s' % (format_dict(key._asdict()), value))
+        for labels, value in self._transaction_start_counter.iter_counts():
+            lines.append('mite_transaction_start_total {%s} %s' % (format_dict(labels), value))
         lines.append('')
         lines.append('# TYPE mite_transaction_end_total counter')
-        for key, value in self._transaction_end_counter.iter_counts():
-            lines.append('mite_transaction_end_total {%s} %s' % (format_dict(key._asdict()), value))
+        for labels, value in self._transaction_end_counter.iter_counts():
+            lines.append('mite_transaction_end_total {%s} %s' % (format_dict(labels), value))
         lines.append('')
         lines.append('# TYPE mite_http_response_time_seconds histogram')
-        for key, _sum, _total_count, bin_counts in  self._response_histogram.iter_histograms():
-            labels = format_dict(key._asdict())
+        for labels, _sum, _total_count, bin_counts in  self._response_histogram.iter_histograms():
+            formatted_labels = format_dict(labels)
             for bin_value, bin_count in bin_counts:
-                lines.append('mite_http_response_time_seconds_bucket{%s,le="%.6f"} %d' % (labels, bin_value, bin_count))
-            lines.append('mite_http_response_time_seconds_bucket{%s,le="+Inf"} %d' % (labels, _total_count))
-            lines.append('mite_http_response_time_seconds_sum{%s} %.6f' % (labels, _sum))
-            lines.append('mite_http_response_time_seconds_count{%s} %d' % (labels, _total_count))
+                lines.append('mite_http_response_time_seconds_bucket{%s,le="%.6f"} %d' % (formatted_labels, bin_value, bin_count))
+            lines.append('mite_http_response_time_seconds_bucket{%s,le="+Inf"} %d' % (formatted_labels, _total_count))
+            lines.append('mite_http_response_time_seconds_sum{%s} %.6f' % (formatted_labels, _sum))
+            lines.append('mite_http_response_time_seconds_count{%s} %d' % (formatted_labels, _total_count))
         lines.append('')
         return '\n'.join(lines)
 
