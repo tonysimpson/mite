@@ -6,7 +6,7 @@ Usage:
     mite [options] journey test JOURNEY_SPEC [DATAPOOL_SPEC]
     mite [options]  controller SCENARIO_SPEC [--message-socket=SOCKET]...
     mite [options] runner [--message-socket=SOCKET]...
-    mite [options] collector
+    mite [options] collector [--message-socket=SOCKET]
     mite --help
     mite --version
 
