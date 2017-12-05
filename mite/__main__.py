@@ -72,7 +72,7 @@ def _check_message_backend(opts):
 def _create_receiver(opts):
     _check_message_backend(opts)
     msg_backend = opts['--message-backend']
-    socket = opts['--message-socket']
+    socket = opts['--message-socket'][0]
     if msg_backend == 'nanomsg':
         return NanomsgReceiver(socket)
     elif msg_backend == 'ZMQ':
