@@ -72,9 +72,9 @@ class RunnerConfig:
 
 
 class Runner:
-    def __init__(self, transport, msg_sender, loop_wait_min=0.01, loop_wait_max=0.5, max_work=None, loop=None, debug=False):
+    def __init__(self, transport, msg_senders, loop_wait_min=0.01, loop_wait_max=0.5, max_work=None, loop=None, debug=False):
         self._transport = transport
-        self._msg_sender = msg_sender
+        self._msg_senders = msg_senders
         self._work = {}
         self._datapool_proxies = {}
         self._stop = False
@@ -185,7 +185,7 @@ class Runner:
                     'scenario_id': scenario_id,
                     'scenario_data_id': scenario_data_id
                 }
-                context = Context(self._msg_sender, config, id_data=id_data, should_stop_func=self.should_stop, debug=self._debug)
+                context = Context(self._msg_senders, config, id_data=id_data, should_stop_func=self.should_stop, debug=self._debug)
                 self._inc_work(scenario_id)
                 future = asyncio.ensure_future(self._execute(context, scenario_id, scenario_data_id, journey_spec, args))
                 future.add_done_callback(on_completion)
