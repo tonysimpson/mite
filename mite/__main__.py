@@ -26,6 +26,7 @@ Options:
     --log-level=LEVEL               Set logger level, one of DEBUG, INFO, WARNING, ERROR, CRITICAL [default: INFO]
     --config=CONFIG_SPEC            Set a config loader to a callable loaded via a spec [default: mite.config:default_config_loader]
     --no-web                        Don't start the build in webserver
+    --web-only                      Start the collector only with webserver
     --spawn-rate=NUM_PER_SECOND     Maximum spawn rate [default: 1000]
     --max-loop-delay=SECONDS        Runner internal loop delay maximum [default: 1]
     --min-loop-delay=SECONDS        Runner internal loop delay minimum [default: 0]
@@ -145,15 +146,14 @@ class DirectReciever:
 
 
 def _setup_msg_processors(reciever, opts):
-    collector = Collector(opts['--collector-dir'], int(opts['--collector-role']))
-    msg_output = MsgOutput()
-    http_stats_output = HttpStatsOutput()
-
     if not opts['--no-web']:
         reciever.add_listener(metrics_processor.process_message)
     if opts['--web-only']:
         reciever.add_listener(metrics_processor.process_message)
         return
+    collector = Collector(opts['--collector-dir'], int(opts['--collector-role']))
+    msg_output = MsgOutput()
+    http_stats_output = HttpStatsOutput()
     reciever.add_listener(collector.process_message)
     reciever.add_listener(http_stats_output.process_message)
     reciever.add_listener(msg_output.process_message)
