@@ -84,7 +84,3 @@ class HttpStatsOutput:
             self._error_total += 1
             self._error_recent += 1
 
-            
-
-
-        

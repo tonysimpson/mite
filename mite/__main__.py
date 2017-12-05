@@ -31,6 +31,7 @@ Options:
     --min-loop-delay=SECONDS        Runner internal loop delay minimum [default: 0]
     --runner-max-journeys=NUMBER    Max number of concurrent journeys a runner can run
     --controller-socket=SOCKET      Controller socket [default: tcp://127.0.0.1:14301]
+
     --message-socket=SOCKET         Message socket [default: tcp://127.0.0.1:14302]
     --delay-start-seconds=DELAY     Delay start allowing others to connect [default: 0]
     --volume=VOLUME                 Volume to run journey at [default: 1]
@@ -150,6 +151,9 @@ def _setup_msg_processors(reciever, opts):
 
     if not opts['--no-web']:
         reciever.add_listener(metrics_processor.process_message)
+    if opts['--web-only']:
+        reciever.add_listener(metrics_processor.process_message)
+        return
     reciever.add_listener(collector.process_message)
     reciever.add_listener(http_stats_output.process_message)
     reciever.add_listener(msg_output.process_message)
@@ -262,6 +266,7 @@ def controller(opts):
         loop.call_later(1, controller_report)
     loop.call_later(1, controller_report)
     loop.run_until_complete(server.run(controller, controller.should_stop))
+
 
 def runner(opts):
     transport = _create_runner_transport(opts)
