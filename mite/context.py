@@ -72,8 +72,8 @@ class _ExceptionHandlerContextManager:
 
 
 class Context:
-    def __init__(self, senders, config, id_data=None, should_stop_func=None, debug=False):
-        self._senders = senders
+    def __init__(self, send, config, id_data=None, should_stop_func=None, debug=False):
+        self._send = send
         self._config = config
         if id_data is None:
             id_data = {}
@@ -96,7 +96,7 @@ class Context:
         msg = content
         msg['type'] = type
         self._add_context_headers_and_time(msg)
-        map(lambda s: s.send(msg), self._senders)
+        self.send(msg)
 
     def transaction(self, name):
         return _TransactionContextManager(self, name)
@@ -139,13 +139,13 @@ class Context:
         self._transaction_names.append(name)
         self._add_context_headers_and_time(msg)
         msg['type'] = 'start'
-        map(lambda s: s.send(msg), self._senders)
+        self.send(msg)
 
     def _end_transaction(self):
         msg= {}
         self._add_context_headers_and_time(msg)
         msg['type'] = 'end'
-        map(lambda s: s.send(msg), self._senders)
+        self.send(msg)
         name = self._transaction_names.pop()
 
     def _exception_handler(self):
