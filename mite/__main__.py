@@ -72,6 +72,8 @@ def _check_message_backend(opts):
 def _create_receiver(opts):
     _check_message_backend(opts)
     msg_backend = opts['--message-backend']
+    if len(opts['--message-socket']) > 1:
+        raise Exception("Collector only collects on one socket, too many --message-socket passed")
     socket = opts['--message-socket'][0]
     if msg_backend == 'nanomsg':
         return NanomsgReceiver(socket)
