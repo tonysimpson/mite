@@ -11,8 +11,8 @@ class ZMQSender:
     def __init__(self, socket_addresses):
         self._zmq_context = zmq.Context()
         self._sockets = [self._zmq_context.socket(zmq.PUSH) for _ in socket_addresses]
-        for i, s in enumerate(socket_addresses):
-            self._sockets[i].bind(s)
+        for sock, addr in zip(self._sockets, socket_addresses):
+            sock.bind(addr)
 
     def send(self, msg):
         pack = pack_msg(msg)

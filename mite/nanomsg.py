@@ -10,8 +10,8 @@ logger = logging.getLogger(__name__)
 class NanomsgSender:
     def __init__(self, socket_addresses):
         self._sockets = [nanomsg.Socket(nanomsg.PUSH) for _ in socket_addresses]
-        for i, s in enumerate(socket_addresses):
-            self._sockets[i].connect(s)
+        for sock, addr in zip(self._sockets, socket_addresses):
+            sock.connect(addr)
 
     def send(self, msg):
         pack = pack_msg(msg)
