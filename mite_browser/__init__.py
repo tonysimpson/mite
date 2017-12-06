@@ -5,6 +5,7 @@ from re import compile as re_compile, IGNORECASE, escape
 from mite import MiteError, ensure_fixed_separation
 import mite_http
 
+EMBEDDED_URL_REGEX = re_compile("url\(\s*[\"'](.*)[\"']\s*\)", IGNORECASE)
 
 class OptionError(MiteError):
     def __init__(self, value, options):
@@ -15,8 +16,7 @@ class ElementNotFoundError(MiteError):
     def __init__(self, **kwargs):
         text = kwargs.pop('text', '').replace("'", "").replace('"', '')
         kwargs['text'] = text
-        super().__init__("Could not find element in page with search terms: {}".format(sorted(kwargs)), **kwargs)
-
+        super().__init__("Could not find element in page with search terms: {}".format(sorted(kwargs.items())), **kwargs)
 
 def url_builder(base_url, *args, **kwargs):
     url = base_url
@@ -234,7 +234,7 @@ class Stylesheet(Resource):
     def _extract_embeded_urls(self):
         """Extracts embedded resources from a stylesheet"""
         base_url = self.response.url
-        for match in re_compile("url\(\s*[\"'](.*)[\"']\s*\)", IGNORECASE).finditer(self.response.text):
+        for match in EMBEDDED_URL_REGEX.finditer(self.response.text):
             yield url_builder(base_url, match)
 
 
