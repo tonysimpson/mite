@@ -81,7 +81,7 @@ def _create_receiver(opts):
         return ZMQReceiver(socket)
 
 
-def _create_senders(opts):
+def _create_sender(opts):
     _check_message_backend(opts)
     msg_backend = opts['--message-backend']
     sockets = opts['--message-socket']
@@ -261,7 +261,7 @@ def controller(opts):
     config_manager = _create_config_manager(opts)
     controller = Controller(scenario_spec, scenario_manager, config_manager)
     server = _create_controller_server(opts)
-    senders = _create_senders(opts)
+    senders = _create_sender(opts)
     loop = asyncio.get_event_loop()
     def controller_report():
         map(lambda s: controller.report(s.send), senders)
@@ -272,7 +272,7 @@ def controller(opts):
 
 def runner(opts):
     transport = _create_runner_transport(opts)
-    senders = _create_senders(opts)
+    senders = _create_sender(opts)
     asyncio.get_event_loop().run_until_complete(_create_runner(opts, transport, senders).run())
 
 
