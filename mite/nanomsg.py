@@ -15,7 +15,8 @@ class NanomsgSender:
 
     def send(self, msg):
         pack = pack_msg(msg)
-        map(lambda s: s.send(pack, self._sockets))
+        for s in self._sockets:
+            s.send(pack)
 
 
 class NanomsgReceiver:
