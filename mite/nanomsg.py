@@ -10,11 +10,12 @@ logger = logging.getLogger(__name__)
 class NanomsgSender:
     def __init__(self, socket_addresses):
         self._sockets = [nanomsg.Socket(nanomsg.PUSH) for _ in socket_addresses]
-        for s in socket_addresses:
-            self._sockets.pop().connect(s)
+        for sock, addr in zip(self._sockets, socket_addresses):
+            sock.connect(addr)
 
     def send(self, msg):
-        map(lambda s: s.send(pack_msg(msg)), self._sockets)
+        pack = pack_msg(msg)
+        map(lambda s: s.send(pack, self._sockets))
 
 
 class NanomsgReceiver:

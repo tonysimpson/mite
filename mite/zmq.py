@@ -11,11 +11,12 @@ class ZMQSender:
     def __init__(self, socket_addresses):
         self._zmq_context = zmq.Context()
         self._sockets = [self._zmq_context.socket(zmq.PUSH) for _ in socket_addresses]
-        for s in socket_addresses:
-            self._sockets.pop().connect(s)
+        for sock, addr in zip(self._sockets, socket_addresses):
+            sock.bind(addr)
 
     def send(self, msg):
-        map(lambda s: s.send(pack_msg(msg)), self._sockets)
+        pack = pack_msg(msg)
+        map(lambda s: s.send(pack, self._sockets))
 
 
 class ZMQReceiver:
