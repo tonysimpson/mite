@@ -1,4 +1,3 @@
-from collections import namedtuple
 import time
 
 
@@ -64,6 +63,7 @@ class Histogram:
             _sum = self._sums[key]
             _total_count = self._total_counts[key]
             yield dict(zip(self._labels, key)), _sum, _total_count, zip(self._bins, bin_counts)
+
 
 class MetricsProcessor:
     def __init__(self):

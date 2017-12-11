@@ -4,9 +4,9 @@ Mite Load Test Framewwork.
 Usage:
     mite [options] scenario test SCENARIO_SPEC
     mite [options] journey test JOURNEY_SPEC [DATAPOOL_SPEC]
-    mite [options] controller SCENARIO_SPEC
-    mite [options] runner
-    mite [options] collector
+    mite [options]  controller SCENARIO_SPEC [--message-socket=SOCKET]...
+    mite [options] runner [--message-socket=SOCKET]...
+    mite [options] collector [--message-socket=SOCKET]
     mite --help
     mite --version
 
@@ -26,11 +26,13 @@ Options:
     --log-level=LEVEL               Set logger level, one of DEBUG, INFO, WARNING, ERROR, CRITICAL [default: INFO]
     --config=CONFIG_SPEC            Set a config loader to a callable loaded via a spec [default: mite.config:default_config_loader]
     --no-web                        Don't start the build in webserver
+    --web-only                      Start the collector only with webserver
     --spawn-rate=NUM_PER_SECOND     Maximum spawn rate [default: 1000]
     --max-loop-delay=SECONDS        Runner internal loop delay maximum [default: 1]
     --min-loop-delay=SECONDS        Runner internal loop delay minimum [default: 0]
     --runner-max-journeys=NUMBER    Max number of concurrent journeys a runner can run
     --controller-socket=SOCKET      Controller socket [default: tcp://127.0.0.1:14301]
+
     --message-socket=SOCKET         Message socket [default: tcp://127.0.0.1:14302]
     --delay-start-seconds=DELAY     Delay start allowing others to connect [default: 0]
     --volume=VOLUME                 Volume to run journey at [default: 1]
@@ -70,7 +72,9 @@ def _check_message_backend(opts):
 def _create_receiver(opts):
     _check_message_backend(opts)
     msg_backend = opts['--message-backend']
-    socket = opts['--message-socket']
+    if len(opts['--message-socket']) > 1:
+        raise Exception("Collector only collects on one socket, too many --message-socket passed")
+    socket = opts['--message-socket'][0]
     if msg_backend == 'nanomsg':
         return NanomsgReceiver(socket)
     elif msg_backend == 'ZMQ':
@@ -80,11 +84,11 @@ def _create_receiver(opts):
 def _create_sender(opts):
     _check_message_backend(opts)
     msg_backend = opts['--message-backend']
-    socket = opts['--message-socket']
+    sockets = opts['--message-socket']
     if msg_backend == 'nanomsg':
-        return NanomsgSender(socket)
+        return NanomsgSender(sockets)
     elif msg_backend == 'ZMQ':
-        return ZMQSender(socket)
+        return ZMQSender(sockets)
 
 
 def _create_runner_transport(opts):
@@ -144,12 +148,14 @@ class DirectReciever:
 
 
 def _setup_msg_processors(reciever, opts):
+    if not opts['--no-web']:
+        reciever.add_listener(metrics_processor.process_message)
+    if opts['--web-only']:
+        reciever.add_listener(metrics_processor.process_message)
+        return
     collector = Collector(opts['--collector-dir'], int(opts['--collector-role']))
     msg_output = MsgOutput()
     http_stats_output = HttpStatsOutput()
-
-    if not opts['--no-web']:
-        reciever.add_listener(metrics_processor.process_message)
     reciever.add_listener(collector.process_message)
     reciever.add_listener(http_stats_output.process_message)
     reciever.add_listener(msg_output.process_message)
@@ -188,13 +194,13 @@ def _create_config_manager(opts):
     return config_manager
 
 
-def _create_runner(opts, transport, msg_sender):
+def _create_runner(opts, transport, msg_senders):
     loop_wait_max = float(opts['--max-loop-delay'])
     loop_wait_min = float(opts['--min-loop-delay'])
     max_work = None
     if opts['--runner-max-journeys']:
         max_work = int(opts['--runner-max-journeys'])
-    return Runner(transport, msg_sender, loop_wait_min=loop_wait_min, loop_wait_max=loop_wait_max, max_work=max_work, debug=opts['--debugging'])
+    return Runner(transport, msg_senders, loop_wait_min=loop_wait_min, loop_wait_max=loop_wait_max, max_work=max_work, debug=opts['--debugging'])
 
 
 def _create_scenario_manager(opts):
@@ -255,18 +261,19 @@ def controller(opts):
     config_manager = _create_config_manager(opts)
     controller = Controller(scenario_spec, scenario_manager, config_manager)
     server = _create_controller_server(opts)
-    sender = _create_sender(opts)
+    senders = _create_sender(opts)
     loop = asyncio.get_event_loop()
     def controller_report():
-        controller.report(sender.send)
+        map(lambda s: controller.report(s.send), senders)
         loop.call_later(1, controller_report)
     loop.call_later(1, controller_report)
     loop.run_until_complete(server.run(controller, controller.should_stop))
 
+
 def runner(opts):
     transport = _create_runner_transport(opts)
-    sender = _create_sender(opts)
-    asyncio.get_event_loop().run_until_complete(_create_runner(opts, transport, sender.send).run())
+    senders = _create_sender(opts)
+    asyncio.get_event_loop().run_until_complete(_create_runner(opts, transport, senders).run())
 
 
 def collector(opts):

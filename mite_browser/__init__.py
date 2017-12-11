@@ -18,7 +18,6 @@ class ElementNotFoundError(MiteError):
         kwargs['text'] = text
         super().__init__("Could not find element in page with search terms: {}".format(sorted(kwargs.items())), **kwargs)
 
-
 def url_builder(base_url, *args, **kwargs):
     url = base_url
     for arg in args:
