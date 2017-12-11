@@ -44,6 +44,7 @@ class ScenarioManager:
     def add_scenario(self, journey_spec, datapool, volumemodel):
         scenario_id = next(self._scenario_id_gen)
         self._scenarios[scenario_id] = Scenario(journey_spec, datapool, volumemodel)
+        logger.info('Added scenario id=%d journey_spec=%r datapool=%r volumemodel=%r', scenario_id, journey_spec, datapool, volumemodel)
 
     def _update_required_and_period(self, start_of_period, end_of_period):
         required = {}
