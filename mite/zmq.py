@@ -12,7 +12,7 @@ class ZMQSender:
         self._zmq_context = zmq.Context()
         self._sockets = [self._zmq_context.socket(zmq.PUSH) for _ in socket_addresses]
         for sock, addr in zip(self._sockets, socket_addresses):
-            sock.bind(addr)
+            sock.connect(addr)
 
     def send(self, msg):
         pack = pack_msg(msg)
