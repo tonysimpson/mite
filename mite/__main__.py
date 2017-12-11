@@ -272,8 +272,8 @@ def controller(opts):
 
 def runner(opts):
     transport = _create_runner_transport(opts)
-    senders = _create_sender(opts)
-    asyncio.get_event_loop().run_until_complete(_create_runner(opts, transport, senders).run())
+    sender = _create_sender(opts)
+    asyncio.get_event_loop().run_until_complete(_create_runner(opts, transport, sender.send).run())
 
 
 def collector(opts):
