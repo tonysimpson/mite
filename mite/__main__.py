@@ -261,10 +261,10 @@ def controller(opts):
     config_manager = _create_config_manager(opts)
     controller = Controller(scenario_spec, scenario_manager, config_manager)
     server = _create_controller_server(opts)
-    senders = _create_sender(opts)
+    sender = _create_sender(opts)
     loop = asyncio.get_event_loop()
     def controller_report():
-        map(lambda s: controller.report(s.send), senders)
+        controller.report(sender.send)
         loop.call_later(1, controller_report)
     loop.call_later(1, controller_report)
     loop.run_until_complete(server.run(controller, controller.should_stop))
