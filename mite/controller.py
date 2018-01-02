@@ -15,7 +15,7 @@ class WorkTracker:
         previous = self._all_work[runner_id]
         for k, v in self._all_work[runner_id].items():
             self._total_work[k] -= v
-        for k, v in work.items()
+        for k, v in work.items():
             self._total_work[k] += v
         self._all_work[runner_id] = defaultdict(int, work)
 
