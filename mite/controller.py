@@ -9,34 +9,33 @@ logger = logging.getLogger(__name__)
 class WorkTracker:
     def __init__(self):
         self._all_work = defaultdict(lambda :defaultdict(int))
-        self._cached = None
+        self._total_work = defaultdict(int)
 
     def set_actual(self, runner_id, work):
-        if work != self._all_work[runner_id]:
-            self._cached = None
-            self._all_work[runner_id] = defaultdict(int, work)
+        previous = self._all_work[runner_id]
+        for k, v in self._all_work[runner_id].items():
+            self._total_work[k] -= v
+        for k, v in work.items()
+            self._total_work[k] += v
+        self._all_work[runner_id] = defaultdict(int, work)
 
     def add_assumed(self, runner_id, work):
-        if work:
-            self._cached = None
-            current = self._all_work[runner_id]
-            for k, v in work.items():
-                current[k] += v
+        current = self._all_work[runner_id]
+        for k, v in work.items():
+            current[k] += v
+            self._total_work[k] += v
     
     def get_total_work(self, runner_ids):
-        if self._cached is not None:
-            return self._cached
-        totals = defaultdict(int)
-        for runner_id in runner_ids:
-            for k, v in self._all_work[runner_id].items():
-                totals[k] += v
-        self._cached = totals
-        return totals
+        for expired_runner_id in set(self._all_work.keys()) - set(runner_ids):
+            self.remove_runner(expired_runner_id)
+        return self._total_work
 
     def get_runner_total(self, runner_id):
         return sum(self._all_work[runner_id].values())
 
     def remove_runner(self, runner_id):
+        for k, v in self._all_work[runner_id].items():
+            self._total_work[k] -= v
         del self._all_work[runner_id]
 
 
