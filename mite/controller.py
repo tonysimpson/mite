@@ -9,20 +9,28 @@ logger = logging.getLogger(__name__)
 class WorkTracker:
     def __init__(self):
         self._all_work = defaultdict(lambda :defaultdict(int))
+        self._cached = None
 
     def set_actual(self, runner_id, work):
-        self._all_work[runner_id] = defaultdict(int, work)
+        if work != self._all_work[runner_id]:
+            self._cached = None
+            self._all_work[runner_id] = defaultdict(int, work)
 
     def add_assumed(self, runner_id, work):
-        current = self._all_work[runner_id]
-        for k, v in work.items():
-            current[k] += v
+        if work:
+            self._cached = None
+            current = self._all_work[runner_id]
+            for k, v in work.items():
+                current[k] += v
     
     def get_total_work(self, runner_ids):
+        if self._cached is not None:
+            return self._cached
         totals = defaultdict(int)
         for runner_id in runner_ids:
             for k, v in self._all_work[runner_id].items():
                 totals[k] += v
+        self._cached = totals
         return totals
 
     def get_runner_total(self, runner_id):
