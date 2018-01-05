@@ -7,19 +7,34 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class NanomsgSender:
-    def __init__(self, socket_addresses):
-        self._sockets = [nanomsg.Socket(nanomsg.PUSH) for _ in socket_addresses]
-        for sock, addr in zip(self._sockets, socket_addresses):
-            sock.connect(addr)
+class Splitter:
+    def __init__(self, in_address, out_addresses):
+        self._in_socket = nanomsg.Socket(nanomsg.PULL)
+        self._in_socket = self._in_socket.bind(in_address)
+        self._out_sockets = [nanomsg.Socket(nanomsg.PUSH) for i in out_addresses]
+        for socket, address in zip(self._out_sockets, out_addresses):
+            socket.connect(address)
+
+    async def run(self, stop_func=None):
+        return await self._loop.run_in_executor(None, self._run, stop_func)
+
+    def _run(self, stop_func=None):
+        while stop_func is None or not stop_func():
+            msg = self._in_socket.recv()
+            for socket in self._out_sockets:
+                socket.send(msg)
+
+
+class Sender:
+    def __init__(self, socket_address):
+        self._socket = nanomsg.Socket(nanomsg.PUSH)
+        self._socket.connect(socket_address)
 
     def send(self, msg):
-        pack = pack_msg(msg)
-        for s in self._sockets:
-            s.send(pack)
+        self._socket.send(pack_msg(msg))
 
 
-class NanomsgReceiver:
+class Receiver:
     def __init__(self, socket_address, listeners=None, raw_listeners=None, loop=None):
         self._sock = nanomsg.Socket(nanomsg.PULL)
         self._sock.bind(socket_address)
@@ -60,7 +75,7 @@ _MSG_TYPE_REQUEST_WORK = 2
 _MSG_TYPE_BYE = 3
 
 
-class NanomsgRunnerTransport:
+class RunnerTransport:
     def __init__(self, socket_address, loop=None):
         self._sock = nanomsg.Socket(nanomsg.REQ)
         self._sock.connect(socket_address)
@@ -94,7 +109,7 @@ class NanomsgRunnerTransport:
         return await self._loop.run_in_executor(None, self._request_work, runner_id)
 
 
-class NanomsgControllerServer:
+class ControllerServer:
     def __init__(self, socket_address, loop=None):
         self._sock = nanomsg.Socket(nanomsg.REP)
         self._sock.bind(socket_address)

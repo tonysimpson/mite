@@ -4,9 +4,12 @@ Mite Load Test Framewwork.
 Usage:
     mite [options] scenario test SCENARIO_SPEC
     mite [options] journey test JOURNEY_SPEC [DATAPOOL_SPEC]
-    mite [options]  controller SCENARIO_SPEC [--message-socket=SOCKET]...
-    mite [options] runner [--message-socket=SOCKET]...
-    mite [options] collector [--message-socket=SOCKET]
+    mite [options] controller SCENARIO_SPEC [--message-socket=SOCKET]
+    mite [options] collector [--message-socket=SOCKET] 
+    mite [options] runner [--message-socket=SOCKET]
+    mite [options] stats [--message-socket=SOCKET] [--agg-socket=SOCKET]
+    mite [options] prometheus-exporter [--agg-socket=SOCKET]
+    mite [options] splitter IN-SOCKET OUT-SOCKET...
     mite --help
     mite --version
 
@@ -25,15 +28,15 @@ Options:
     --debugging                     Drop into IPDB on journey error and exit
     --log-level=LEVEL               Set logger level, one of DEBUG, INFO, WARNING, ERROR, CRITICAL [default: INFO]
     --config=CONFIG_SPEC            Set a config loader to a callable loaded via a spec [default: mite.config:default_config_loader]
-    --no-web                        Don't start the build in webserver
+    --no-web                        Don't start the built in webserver
     --web-only                      Start the collector only with webserver
     --spawn-rate=NUM_PER_SECOND     Maximum spawn rate [default: 1000]
     --max-loop-delay=SECONDS        Runner internal loop delay maximum [default: 1]
     --min-loop-delay=SECONDS        Runner internal loop delay minimum [default: 0]
     --runner-max-journeys=NUMBER    Max number of concurrent journeys a runner can run
     --controller-socket=SOCKET      Controller socket [default: tcp://127.0.0.1:14301]
-
     --message-socket=SOCKET         Message socket [default: tcp://127.0.0.1:14302]
+    --add-socket=SOCKET             Message socket [default: tcp://127.0.0.1:14303]
     --delay-start-seconds=DELAY     Delay start allowing others to connect [default: 0]
     --volume=VOLUME                 Volume to run journey at [default: 1]
     --web-address=HOST_POST         Web bind address [default: 127.0.0.1:9301]
@@ -56,11 +59,19 @@ from .runner import Runner
 from .collector import Collector
 from .utils import spec_import, pack_msg
 from .web import app, metrics_processor
-from .nanomsg import NanomsgSender, NanomsgReceiver, NanomsgRunnerTransport, NanomsgControllerServer
-from .zmq import ZMQSender, ZMQReceiver, ZMQRunnerTransport, ZMQControllerServer
 from .logoutput import MsgOutput, HttpStatsOutput
 
-_MESSAGE_BACKENDS = ['ZMQ', 'nanomsg']
+
+def _msg_backend_module(opts):
+    msg_backend = opts['--message-backend']
+     if msg_backend == 'nanomsg':
+         import .nanomsg
+         return nanomsg
+     elif msg_backend == 'ZMQ':
+         import .zmq
+         return zmq
+    else:
+        raise ValueError('Unsupported backend %r' % (msg_backend,))
 
 
 def _check_message_backend(opts):
@@ -70,45 +81,27 @@ def _check_message_backend(opts):
 
 
 def _create_receiver(opts):
-    _check_message_backend(opts)
-    msg_backend = opts['--message-backend']
-    if len(opts['--message-socket']) > 1:
-        raise Exception("Collector only collects on one socket, too many --message-socket passed")
-    socket = opts['--message-socket'][0]
-    if msg_backend == 'nanomsg':
-        return NanomsgReceiver(socket)
-    elif msg_backend == 'ZMQ':
-        return ZMQReceiver(socket)
+    socket = opts['--message-socket']
+    return _msg_backend_module(opts).Receiver(socket)
 
 
 def _create_sender(opts):
-    _check_message_backend(opts)
-    msg_backend = opts['--message-backend']
-    sockets = opts['--message-socket']
-    if msg_backend == 'nanomsg':
-        return NanomsgSender(sockets)
-    elif msg_backend == 'ZMQ':
-        return ZMQSender(sockets)
+    socket = opts['--message-socket']
+    return _msg_backend_module(opts).Sender(socket)
 
 
 def _create_runner_transport(opts):
-    _check_message_backend(opts)
-    msg_backend = opts['--message-backend']
     socket = opts['--controller-socket']
-    if msg_backend == 'nanomsg':
-        return NanomsgRunnerTransport(socket)
-    elif msg_backend == 'ZMQ':
-        return ZMQRunnerTransport(socket)
+    return _msg_backend_module(opts).RunnerTransport(socket)
 
 
 def _create_controller_server(opts):
-    _check_message_backend(opts)
-    msg_backend = opts['--message-backend']
     socket = opts['--controller-socket']
-    if msg_backend == 'nanomsg':
-        return NanomsgControllerServer(socket)
-    elif msg_backend == 'ZMQ':
-        return ZMQControllerServer(socket)
+    return _msg_backend_module(opts).ControllerServer(socket)
+
+
+def _create_splitter(opts):
+    return _msg_backend_module(opts).Splitter(opts['IN-SOCKET'], opts['OUT-SOCKET'])
 
 
 logger = logging.getLogger(__name__)
@@ -283,6 +276,11 @@ def collector(opts):
     asyncio.get_event_loop().run_until_complete(receiver.run())
 
 
+def splitter(opts):
+    splitter = _create_splitter(opts)
+    asyncio.get_event_loop().run_until_complete(splitter.run())
+
+
 def setup_logging(opts):
     logging.basicConfig(
         level=opts['--log-level'],
@@ -308,6 +306,8 @@ def main():
         runner(opts)
     elif opts['collector']:
         collector(opts)
+    elif opts['splitter']:
+        splitter(opts)
 
 
 if __name__ == '__main__':
