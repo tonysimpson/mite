@@ -1,15 +1,15 @@
 import sys
 from flask import Flask, Response
 
-from .metrics import MetricsProcessor
+from .prometheus import PrometheusMetrics
 
 app = Flask(__name__)
 
-metrics_processor = MetricsProcessor()
+prometheus_metrics = PrometheusMetrics()
 
 @app.route('/metrics')
 def metrics():
-    text = metrics_processor.prometheus_metrics()
+    text = prometheus_metrics.format()
     return Response(text, mimetype='text/plain')
 
 

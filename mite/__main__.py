@@ -4,12 +4,12 @@ Mite Load Test Framewwork.
 Usage:
     mite [options] scenario test SCENARIO_SPEC
     mite [options] journey test JOURNEY_SPEC [DATAPOOL_SPEC]
-    mite [options] controller SCENARIO_SPEC [--message-socket=SOCKET]
-    mite [options] collector [--message-socket=SOCKET] 
-    mite [options] runner [--message-socket=SOCKET]
-    mite [options] stats [--message-socket=SOCKET] [--agg-socket=SOCKET]
-    mite [options] prometheus-exporter [--agg-socket=SOCKET]
-    mite [options] splitter IN-SOCKET OUT-SOCKET...
+    mite [options] controller SCENARIO_SPEC [--message-socket=SOCKET] [--controller-socket=SOCKET]
+    mite [options] runner [--message-socket=SOCKET] [--controller-socket=SOCKET]
+    mite [options] duplicator [--message-socket=SOCKET] OUT_SOCKET...
+    mite [options] collector [--collector-socket=SOCKET]
+    mite [options] stats [--stats-in-socket=SOCKET] [--stats-out-socket=SOCKET]
+    mite [options] prometheus_exporter [--stats-out-socket=SOCKET] [--web-address=HOST_PORT]
     mite --help
     mite --version
 
@@ -28,18 +28,18 @@ Options:
     --debugging                     Drop into IPDB on journey error and exit
     --log-level=LEVEL               Set logger level, one of DEBUG, INFO, WARNING, ERROR, CRITICAL [default: INFO]
     --config=CONFIG_SPEC            Set a config loader to a callable loaded via a spec [default: mite.config:default_config_loader]
-    --no-web                        Don't start the built in webserver
-    --web-only                      Start the collector only with webserver
     --spawn-rate=NUM_PER_SECOND     Maximum spawn rate [default: 1000]
     --max-loop-delay=SECONDS        Runner internal loop delay maximum [default: 1]
     --min-loop-delay=SECONDS        Runner internal loop delay minimum [default: 0]
     --runner-max-journeys=NUMBER    Max number of concurrent journeys a runner can run
     --controller-socket=SOCKET      Controller socket [default: tcp://127.0.0.1:14301]
     --message-socket=SOCKET         Message socket [default: tcp://127.0.0.1:14302]
-    --add-socket=SOCKET             Message socket [default: tcp://127.0.0.1:14303]
+    --collector-socket=SOCKET       Socket [default: tcp://127.0.0.1:14303]
+    --stats-in-socket=SOCKET        Socket [default: tcp://127.0.0.1:14304]
+    --stats-out-socket=SOCKET       Socket [default: tcp://127.0.0.1:14305]
     --delay-start-seconds=DELAY     Delay start allowing others to connect [default: 0]
     --volume=VOLUME                 Volume to run journey at [default: 1]
-    --web-address=HOST_POST         Web bind address [default: 127.0.0.1:9301]
+    --web-address=HOST_PORT         Web bind address [default: 127.0.0.1:9301]
     --message-backend=BACKEND       Backend to transport messages over [default: ZMQ]
     --exclude-working-directory     By default mite puts the current directory on the python path
     --collector-dir=DIRECTORY       Set the collectors output directory [default: collector_data]
@@ -58,18 +58,19 @@ from .controller import Controller
 from .runner import Runner
 from .collector import Collector
 from .utils import spec_import, pack_msg
-from .web import app, metrics_processor
+from .web import app, prometheus_metrics
 from .logoutput import MsgOutput, HttpStatsOutput
+from .stats import Stats
 
 
 def _msg_backend_module(opts):
     msg_backend = opts['--message-backend']
-     if msg_backend == 'nanomsg':
-         import .nanomsg
-         return nanomsg
-     elif msg_backend == 'ZMQ':
-         import .zmq
-         return zmq
+    if msg_backend == 'nanomsg':
+        from . import nanomsg
+        return nanomsg
+    elif msg_backend == 'ZMQ':
+        from . import zmq
+        return zmq
     else:
         raise ValueError('Unsupported backend %r' % (msg_backend,))
 
@@ -80,14 +81,39 @@ def _check_message_backend(opts):
         raise Exception('message backend %r not a valid option %r' % (msg_backend, _MESSAGE_BACKENDS))
 
 
-def _create_receiver(opts):
-    socket = opts['--message-socket']
-    return _msg_backend_module(opts).Receiver(socket)
+def _collector_receiver(opts):
+    socket = opts['--collector-socket']
+    receiver = _msg_backend_module(opts).Receiver()
+    receiver.connect(socket)
+    return receiver
 
 
 def _create_sender(opts):
     socket = opts['--message-socket']
-    return _msg_backend_module(opts).Sender(socket)
+    sender = _msg_backend_module(opts).Sender()
+    sender.connect(socket)
+    return sender
+
+
+def _create_stats_sender(opts):
+    socket = opts['--stats-out-socket']
+    sender = _msg_backend_module(opts).Sender()
+    sender.connect(socket)
+    return sender
+
+
+def _create_stats_receiver(opts):
+    socket = opts['--stats-in-socket']
+    receiver = _msg_backend_module(opts).Receiver()
+    receiver.connect(socket)
+    return receiver
+
+
+def _create_prometheus_exporter_receiver(opts):
+    socket = opts['--stats-out-socket']
+    receiver = _msg_backend_module(opts).Receiver()
+    receiver.bind(socket)
+    return receiver
 
 
 def _create_runner_transport(opts):
@@ -100,8 +126,8 @@ def _create_controller_server(opts):
     return _msg_backend_module(opts).ControllerServer(socket)
 
 
-def _create_splitter(opts):
-    return _msg_backend_module(opts).Splitter(opts['IN-SOCKET'], opts['OUT-SOCKET'])
+def _create_duplicator(opts):
+    return _msg_backend_module(opts).Duplicator(opts['--message-socket'], opts['OUT_SOCKET'])
 
 
 logger = logging.getLogger(__name__)
@@ -140,24 +166,17 @@ class DirectReciever:
             raw_listener(packed_msg)
 
 
-def _setup_msg_processors(reciever, opts):
-    if not opts['--no-web']:
-        reciever.add_listener(metrics_processor.process_message)
-    if opts['--web-only']:
-        reciever.add_listener(metrics_processor.process_message)
-        return
+def _setup_msg_processors(receiver, opts):
     collector = Collector(opts['--collector-dir'], int(opts['--collector-role']))
     msg_output = MsgOutput()
     http_stats_output = HttpStatsOutput()
-    reciever.add_listener(collector.process_message)
-    reciever.add_listener(http_stats_output.process_message)
-    reciever.add_listener(msg_output.process_message)
-    reciever.add_raw_listener(collector.process_raw_message)
+    receiver.add_listener(collector.process_message)
+    receiver.add_listener(http_stats_output.process_message)
+    receiver.add_listener(msg_output.process_message)
+    receiver.add_raw_listener(collector.process_raw_message)
 
 
-def _maybe_start_web_in_thread(opts):
-    if opts['--no-web']:
-        return
+def _start_web_in_thread(opts):
     address = opts['--web-address']
     kwargs = {'port': 9301}
     if address.startswith('['):
@@ -201,21 +220,20 @@ def _create_scenario_manager(opts):
 
 
 def test_scenarios(test_name, opts, scenarios):
-    _maybe_start_web_in_thread(opts)
     scenario_manager = _create_scenario_manager(opts)
     for journey_spec, datapool, volumemodel in scenarios:
         scenario_manager.add_scenario(journey_spec, datapool, volumemodel)
     config_manager = _create_config_manager(opts)
     controller = Controller(test_name, scenario_manager, config_manager)
     transport = DirectRunnerTransport(controller)
-    reciever = DirectReciever()
-    _setup_msg_processors(reciever, opts)
+    receiver = DirectReciever()
+    _setup_msg_processors(receiver, opts)
     loop = asyncio.get_event_loop()
     def controller_report():
-        controller.report(reciever.recieve)
+        controller.report(receiver.recieve)
         loop.call_later(1, controller_report)
     loop.call_later(1, controller_report)
-    loop.run_until_complete(_create_runner(opts, transport, reciever.recieve).run())
+    loop.run_until_complete(_create_runner(opts, transport, receiver.recieve).run())
 
 
 def scenario_test_cmd(opts):
@@ -270,15 +288,37 @@ def runner(opts):
 
 
 def collector(opts):
-    _maybe_start_web_in_thread(opts)
-    receiver = _create_receiver(opts)
-    _setup_msg_processors(receiver, opts)
+    receiver = _collector_receiver(opts)
+    collector = Collector(opts['--collector-dir'], int(opts['--collector-role']))
+    receiver.add_listener(collector.process_message)
+    receiver.add_raw_listener(collector.process_raw_message)
     asyncio.get_event_loop().run_until_complete(receiver.run())
 
 
-def splitter(opts):
-    splitter = _create_splitter(opts)
-    asyncio.get_event_loop().run_until_complete(splitter.run())
+def duplicator(opts):
+    duplicator = _create_duplicator(opts)
+    asyncio.get_event_loop().run_until_complete(duplicator.run())
+
+
+def stats(opts):
+    receiver = _create_stats_receiver(opts)
+    agg_sender = _create_stats_sender(opts)
+    stats = Stats()
+    receiver.add_listener(stats.process)
+    loop = asyncio.get_event_loop()
+    def dump_callback():
+        agg_sender.send(stats.dump())
+        loop.call_later(0.1, dump_callback)
+    loop.call_later(0.1, dump_callback)
+    loop.run_until_complete(receiver.run())
+
+
+def prometheus_exporter(opts):
+    receiver = _create_prometheus_exporter_receiver(opts)
+    receiver.add_listener(prometheus_metrics.process)
+    _start_web_in_thread(opts)
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(receiver.run())
 
 
 def setup_logging(opts):
@@ -306,8 +346,12 @@ def main():
         runner(opts)
     elif opts['collector']:
         collector(opts)
-    elif opts['splitter']:
-        splitter(opts)
+    elif opts['duplicator']:
+        duplicator(opts)
+    elif opts['stats']:
+        stats(opts)
+    elif opts['prometheus_exporter']:
+        prometheus_exporter(opts)
 
 
 if __name__ == '__main__':

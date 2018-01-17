@@ -7,14 +7,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class Splitter:
-    def __init__(self, in_address, out_addresses):
+class Duplicator:
+    def __init__(self, in_address, out_addresses, loop=None):
         self._zmq_context = zmq.Context()
         self._in_socket = self._zmq_context.socket(zmq.PULL)
-        self._in_socket = self._in_socket.bind(in_address)
+        self._in_socket.bind(in_address)
         self._out_sockets = [self._zmq_context.socket(zmq.PUSH) for i in out_addresses]
         for socket, address in zip(self._out_sockets, out_addresses):
-            socket.connect(address)
+            socket.bind(address)
+        if loop is None:
+            loop = asyncio.get_event_loop()
+        self._loop = loop
 
     async def run(self, stop_func=None):
         return await self._loop.run_in_executor(None, self._run, stop_func)
@@ -27,20 +30,24 @@ class Splitter:
 
 
 class Sender:
-    def __init__(self, socket_address):
+    def __init__(self):
         self._zmq_context = zmq.Context()
         self._socket = self._zmq_context.socket(zmq.PUSH)
-        self._socket.connect(socket_address)
+
+    def bind(self, address):
+        self._socket.bind(address)
+
+    def connect(self, address):
+        self._socket.connect(address)
 
     def send(self, msg):
         self._socket.send(pack_msg(msg))
 
 
 class Receiver:
-    def __init__(self, socket_address, listeners=None, raw_listeners=None, loop=None):
+    def __init__(self, listeners=None, raw_listeners=None, loop=None):
         self._zmq_context = zmq.Context()
-        self._sock = self._zmq_context.socket(zmq.PULL)
-        self._sock.bind(socket_address)
+        self._socket = self._zmq_context.socket(zmq.PULL)
         if listeners is None:
             listeners = []
         self._listeners = listeners
@@ -51,6 +58,12 @@ class Receiver:
             loop = asyncio.get_event_loop()
         self._loop = loop
 
+    def bind(self, address):
+        self._socket.bind(address)
+
+    def connect(self, address):
+        self._socket.connect(address)
+
     def add_listener(self, listener):
         self._listeners.append(listener)
     
@@ -58,7 +71,7 @@ class Receiver:
         self._raw_listeners.append(listener)
 
     def _recv(self):
-        return self._sock.recv()
+        return self._socket.recv()
 
     async def run(self, stop_func=None):
         return await self._loop.run_in_executor(None, self._run, stop_func)
@@ -95,13 +108,9 @@ class RunnerTransport:
         return await self._loop.run_in_executor(None, self._hello)
 
     def _request_work(self, runner_id, current_work, completed_data_ids, max_work):
-        logger.debug('socket send')
         self._sock.send(pack_msg((_MSG_TYPE_REQUEST_WORK, [runner_id, current_work, completed_data_ids, max_work])))
-        logger.debug('socket receive')
         msg = self._sock.recv()
-        logger.debug('got response')
         result = unpack_msg(msg)
-        logger.debug('done') 
         return result
 
     async def request_work(self, runner_id, current_work, completed_data_ids, max_work):
