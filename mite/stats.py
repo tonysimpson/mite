@@ -103,7 +103,8 @@ def controller_report_extractor(dict_key):
 
 
 class Stats:
-    def __init__(self):
+    def __init__(self, sender):
+        self.sender = sender
         transaction_key = 'test journey transaction'.split()
         self.processors = [
                 Counter('mite_journey_error_total', matcher_by_type('error', 'exception'), labels_extractor('test journey transaction location message'.split())),
@@ -115,10 +116,15 @@ class Stats:
                 Gauge('mite_requird_count', matcher_by_type('controller_report'), controller_report_extractor('required')),
                 Gauge('mite_runner_count', matcher_by_type('controller_report'), labels_and_value_extractor(['test'], 'num_runners'))
         ]
+        self.dump_timeout = time.time() + 0.25
 
     def process(self, msg):
         for processor in self.processors:
             processor.process(msg)
+        t = time.time()
+        if t > self.dump_timeout:
+            self.sender(self.dump())
+            self.dump_timeout = t + 0.25
 
     def dump(self):
         return [i.dump() for i in self.processors]

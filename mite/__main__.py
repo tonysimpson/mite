@@ -304,13 +304,9 @@ def duplicator(opts):
 def stats(opts):
     receiver = _create_stats_receiver(opts)
     agg_sender = _create_stats_sender(opts)
-    stats = Stats()
+    stats = Stats(sender=agg_sender.send)
     receiver.add_listener(stats.process)
     loop = asyncio.get_event_loop()
-    def dump_callback():
-        agg_sender.send(stats.dump())
-        loop.call_later(0.1, dump_callback)
-    loop.call_later(0.1, dump_callback)
     loop.run_until_complete(receiver.run())
 
 
