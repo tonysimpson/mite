@@ -49,7 +49,7 @@ class Histogram:
         self.name = name
         self.labels = message['labels']
         self.bins = message['bins']
-        self.bin_counts = defaultdict(lambda: [0] * len(self.bins), message['bin_counts'])
+        self.bin_counts = defaultdict(lambda: [0] * len(self.bins), {K:list(v) for k,v in message['bin_counts'].items()})
         self.sums = defaultdict(float, message['sums'])
         self.total_counts = defaultdict(int, message['total_counts'])
 
