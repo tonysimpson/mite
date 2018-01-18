@@ -69,7 +69,7 @@ class Histogram:
         for key, bin_counts in sorted(self.bin_counts.items()):
             sum = self.sums[key]
             total_count = self.total_counts[key]
-            labels = dict(zip(self.labels, key))
+            labels = format_dict(dict(zip(self.labels, key)))
             for bin_label, bin_count in zip(self.bins, bin_counts):
                 lines.append('%s{%s,le="%.6f"} %d' % (self.name, labels, bin_label, bin_count))
             lines.append('%s{%s,le="+Inf"} %d' % (self.name, labels, total_count))
