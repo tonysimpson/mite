@@ -51,6 +51,7 @@ import asyncio
 import docopt
 import threading
 import logging
+import uvloop
 
 from .scenario import ScenarioManager
 from .config import ConfigManager
@@ -333,6 +334,7 @@ def configure_python_path(opts):
 
 
 def main():
+    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
     opts = docopt.docopt(__doc__)
     setup_logging(opts)
     configure_python_path(opts)

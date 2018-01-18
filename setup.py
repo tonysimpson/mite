@@ -13,7 +13,8 @@ setup(
         'bs4',
         'nanomsg',
         'flask',
-        'pyzmq'
+        'pyzmq',
+        'uvloop',
     ],
     entry_points={
         'console_scripts': [
