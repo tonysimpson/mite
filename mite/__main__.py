@@ -28,7 +28,6 @@ Options:
     --debugging                     Drop into IPDB on journey error and exit
     --log-level=LEVEL               Set logger level, one of DEBUG, INFO, WARNING, ERROR, CRITICAL [default: INFO]
     --config=CONFIG_SPEC            Set a config loader to a callable loaded via a spec [default: mite.config:default_config_loader]
-    --spawn-rate=NUM_PER_SECOND     Maximum spawn rate [default: 1000]
     --max-loop-delay=SECONDS        Runner internal loop delay maximum [default: 1]
     --min-loop-delay=SECONDS        Runner internal loop delay minimum [default: 0]
     --runner-max-journeys=NUMBER    Max number of concurrent journeys a runner can run

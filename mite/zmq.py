@@ -107,14 +107,14 @@ class RunnerTransport:
     async def hello(self):
         return await self._loop.run_in_executor(None, self._hello)
 
-    def _request_work(self, runner_id, current_work, completed_data_ids, max_work):
-        self._sock.send(pack_msg((_MSG_TYPE_REQUEST_WORK, [runner_id, current_work, completed_data_ids, max_work])))
+    def _request_work(self, runner_id, completed_work_ids, max_work):
+        self._sock.send(pack_msg((_MSG_TYPE_REQUEST_WORK, [runner_id, completed_work_ids, max_work])))
         msg = self._sock.recv()
         result = unpack_msg(msg)
         return result
 
-    async def request_work(self, runner_id, current_work, completed_data_ids, max_work):
-        return await self._loop.run_in_executor(None, self._request_work, runner_id, current_work, completed_data_ids, max_work)
+    async def request_work(self, runner_id, completed_work_ids, max_work):
+        return await self._loop.run_in_executor(None, self._request_work, runner_id, completed_work_ids, max_work)
 
     def _bye(self, runner_id):
         self._sock.send(pack_msg((_MSG_TYPE_BYE, runner_id)))

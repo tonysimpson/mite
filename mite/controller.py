@@ -66,6 +66,57 @@ class RunnerTracker:
 
     def get_active_count(self):
         return len(self.get_active())
+    
+
+class OnlineMean:
+    def __init__(self):
+        self.mean = 0
+        self.n = 0
+
+    def update(self, value):
+        self.n += 1
+        delta = value - self.mean
+        self.mean += delta / self.n
+
+
+class LifespaneEstimationSpawnRateLimiter:
+    def __init__(self, initial_lifespan_estimate=10):
+        self._lifespan_mean = OnlineMean()
+        self._lifespan_mean.update(initial_lifespan_estimate)
+        self._birth_times = deque()
+
+    def update_births(self, num):
+        t = time.time()
+        for i in range(num):
+            self._birth_times.append(t)
+
+    def update_deaths(self, num):
+        t = time.time()
+        for i in range(num):
+            st = self._birth_times.popleft()
+            self._lifespan_mean.update(t - st)
+
+
+
+class RateLimiter:
+    def __init__(self, initial_birth_rate_limit=100, time_window=10, growth_rate=2):
+        self._birth_rate_limit = initial_birth_rate_limit
+        self._time_window = time_window
+        self._growth_rate = growth_rate
+        self._deaths = deque()
+
+    def update(self, number_of_deaths):
+        if number_of_deaths > 0:
+            t = time.time()
+            self._deaths.append((t, number_of_deaths))
+            while self._deaths:
+                if t > self._deaths[0][0] + self._time_window:
+                    self._deaths.popleft()
+            new_limit = (sum(i[1] for i in self._deaths) / self._time_window) * self._growth_rate 
+            self._birth_rate_limit = new_limit if new_limit > self._birth_rate_limit
+
+    def get_limit(self, hit_rate):
+        return self._birth_rate_limit / hit_rate if hit_rate > 0 else 0
 
 
 class Controller:
@@ -73,19 +124,16 @@ class Controller:
         self._testname = testname
         self._scenario_manager = scenario_manager
         self._runner_id_gen = count(1)
+        self._work_id_gen = count(1)
         self._work_tracker = WorkTracker()
         self._runner_tracker = RunnerTracker()
+        self._rate_limiter = RateLimiter()
         self._config_manager = config_manager
 
     def hello(self):
         runner_id = next(self._runner_id_gen)
         return runner_id, self._testname, self._config_manager.get_changes_for_runner(runner_id)
 
-    def _set_actual(self, runner_id, current_work):
-        self._work_tracker.set_actual(runner_id, current_work)
-
-    def _add_assumed(self, runner_id, work):
-        self._work_tracker.add_assumed(runner_id, work)
     
     def _required_work_for_runner(self, runner_id, max_work=None):
         runner_total = self._work_tracker.get_runner_total(runner_id)
@@ -96,12 +144,19 @@ class Controller:
         self._add_assumed(runner_id, scenario_volume_map) 
         return work
 
-    def request_work(self, runner_id, current_work, completed_data_ids, max_work=None):
-        self._set_actual(runner_id, current_work)
-        self._runner_tracker.update(runner_id)
-        self._scenario_manager.checkin_data(completed_data_ids)
-        work = self._required_work_for_runner(runner_id, max_work)
-        return work, self._config_manager.get_changes_for_runner(runner_id), not self._scenario_manager.is_active()
+    def request_work(self, runner_id, completed_work_ids, max_work=None):
+        self._update_with_completed_work_ids(runner_id, completed_work_ids)
+        limit = self._calculate_limits(max_work)
+        current_work = self._work_tracker.get_total_work(self._runner_tracker.get_active())
+        work = self._scenario_manager.get_work(current_work, limit)
+        self._config_manager.get_changes_for_runner(runner_id)
+        runner_should_continue = not self._scenario_manager.is_active()
+        config_delta = self._config_manager.get_changes_for_runner(runner_id)
+        return work, config_delta, runner_should_continue
+
+    def bye(self, runner_id):
+        self._runner_tracker.remove_runner(runner_id)
+        self._work_tracker.remove_runner(runner_id)
 
     def report(self, sender):
         required = self._scenario_manager.get_required_work()
@@ -119,8 +174,10 @@ class Controller:
     def should_stop(self):
         return (not self._scenario_manager.is_active()) and self._runner_tracker.get_active_count() == 0
 
-    def bye(self, runner_id):
-        self._runner_tracker.remove_runner(runner_id)
-        self._work_tracker.remove_runner(runner_id)
 
-
+    def _update_with_completed_work_ids(self, runner_id, completed_work_ids):
+        self._runner_tracker.remove_work(runner_id, completed_work_ids)
+        for work_id in completed_work_ids:
+            scenario_id, data_id = self._work_id_to_scenario_and_data_id.pop(work_id)
+            self._work_tracker.end_work(runner_id, scenario_id)
+            self._scenario_manager.checkin_data(scenario_id, data_id)
