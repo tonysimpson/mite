@@ -118,6 +118,18 @@ class RateLimiter:
     def get_limit(self, hit_rate):
         return self._birth_rate_limit / hit_rate if hit_rate > 0 else 0
 
+"""Calculating Limits
+
+Rate limit is based on how quickly you'd need to create new work to reach the target population for that scenario
+
+So we calculate how many would die per second at peak population.
+
+limit = ((1 / hit_rate) / average_duration_of_work_for_scenario) * target_pop_for_scenario
+
+"""
+
+
+
 
 class Controller:
     def __init__(self, testname, scenario_manager, config_manager):
@@ -133,16 +145,6 @@ class Controller:
     def hello(self):
         runner_id = next(self._runner_id_gen)
         return runner_id, self._testname, self._config_manager.get_changes_for_runner(runner_id)
-
-    
-    def _required_work_for_runner(self, runner_id, max_work=None):
-        runner_total = self._work_tracker.get_runner_total(runner_id)
-        active_runner_ids = self._runner_tracker.get_active()
-        current_work = self._work_tracker.get_total_work(active_runner_ids)
-        hit_rate = self._runner_tracker.get_hit_rate()
-        work, scenario_volume_map = self._scenario_manager.get_work(current_work, runner_total, len(active_runner_ids), max_work, hit_rate)
-        self._add_assumed(runner_id, scenario_volume_map) 
-        return work
 
     def request_work(self, runner_id, completed_work_ids, max_work=None):
         self._update_with_completed_work_ids(runner_id, completed_work_ids)

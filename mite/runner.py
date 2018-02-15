@@ -18,11 +18,11 @@ class RunnerControllerTransportExample:
             """
         pass
 
-    async def request_work(self, runner_id, completed_work_ids, max_work):
+    async def request_work(self, runner_id, completed_work, max_work):
         """\
         Takes:
             runner_id
-            completed_work_ids - list of work_ids
+            completed_work - list of [work_id, duration] tuples
             max_work - may be None to indicate no limit
         Returns:
             work - list of (work_id, journey_spec, args) - args may be None
@@ -114,19 +114,19 @@ class Runner:
             timeout_handle.cancel()
             timeout_handle = self._loop.call_later(self._loop_wait_max, stop_waiting)
             waiter = self._loop.create_future()
-            c = []
+            _completed_work = []
             for f in _completed:
                 self._work_count -= 1
                 work_id = f.result()
-                c.append(work_id)
+                _completed_work.append(work_id)
             del _completed[:]
-            return c
+            return _completed_work
 
         timeout_handle = self._loop.call_later(self._loop_wait_max, stop_waiting)
         waiter = self._loop.create_future()
-        completed_work_ids = []
+        completed_work = []
         while not self._stop:
-            work, config_list, self._stop = await self._transport.request_work(runner_id, completed_work_ids, self._max_work)
+            work, config_list, self._stop = await self._transport.request_work(runner_id, completed_work, self._max_work)
             config._update(config_list)
             for num, (work_id, journey_spec, args) in enumerate(work):
                 id_data = {
@@ -140,12 +140,12 @@ class Runner:
                 self._work_count += 1
                 future = asyncio.ensure_future(self._execute(context, work_id, journey_spec, args))
                 future.add_done_callback(on_completion)
-            completed_work_ids = await wait()
+            completed_work = await wait()
         while self._work_count:
-            _, config_list, _ = await self._transport.request_work(runner_id, completed_work_ids, 0)
+            _, config_list, _ = await self._transport.request_work(runner_id, completed_work, 0)
             config._update(config_list)
-            completed_work_ids = await wait()
-        await self._transport.request_work(runner_id, completed_work_ids, 0)
+            completed_work = await wait()
+        await self._transport.request_work(runner_id, completed_work, 0)
         await self._transport.bye(runner_id)
 
     async def _execute(self, context, work_id, journey_spec, args):
@@ -154,7 +154,8 @@ class Runner:
             async with context.transaction('__root__'):
                 journey = spec_import(journey_spec)
                 if args is None:
-                    await journey(context)
-                else:
-                    await journey(context, *args)
-        return work_id
+                    args = []
+                st = time.time()
+                await journey(context, *args)
+                duration = time.time() - st
+        return work_id, duration
